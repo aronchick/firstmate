@@ -140,10 +140,11 @@ trap 'rm -f "$RULES"' EXIT
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
+CODEX_MAX_MODELS=$("$SCRIPT_DIR/fm-model-tier.sh" max-models codex 2>/dev/null || echo '[]')
 
 # The fields this tool consumes must be well formed; bootstrap owns the wider
 # schema diagnostic, but an intake never selects around a malformed file.
-rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --argjson codex_max_models "$CODEX_MAX_MODELS" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
   def verified($h): $verified_harnesses | index($h);
   def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
   def effort_ok($h; $m; $e):
@@ -151,7 +152,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
     elif ($e | type) != "string" then false
     elif $e == "ultra" then (($h == "pi" or $h == "pi-signed") and (($m | type) == "string") and ($m | startswith("codex-native/")) and ($m | length) > 13)
     elif $h == "claude" then (["low","medium","high","xhigh","max"] | index($e)) != null
-    elif $h == "codex" then ((["low","medium","high","xhigh"] | index($e)) != null or ($e == "max" and $m == "gpt-5.6-luna"))
+    elif $h == "codex" then ((["low","medium","high","xhigh"] | index($e)) != null or ($e == "max" and (if $m != null then ($codex_max_models | index($m)) != null else true end)))
     elif $h == "grok" or $h == "agy" then (["low","medium","high"] | index($e)) != null
     elif $h == "pi" or $h == "pi-signed" or $h == "omp" or $h == "muse" then (["low","medium","high","xhigh","max"] | index($e)) != null
     elif $h == "rovo" then (["low","medium","high","max"] | index($e)) != null
@@ -169,12 +170,13 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   def profile_bad($p):
     ($p | type) != "object"
     or (($p.harness | type) != "string") or (($p.harness | length) == 0)
+    or ($p | has("tier") and ((.tier | type) != "string" or (.tier | length) == 0))
     or ($p | has("model") and ((.model | type) != "string" or (.model | length) == 0))
     or ($p | has("effort") and ((.effort | type) != "string" or (.effort | length) == 0))
     or ($p | has("provider") and (provider_id(.provider) | not))
     or ($p | has("floor") and floor_bad(.floor; false));
   def duplicate_profiles($items):
-    ($items | map([.harness, (.model // null), (.effort // null)] | @json)) as $keys
+    ($items | map([.harness, (.tier // null), (.model // null), (.effort // null)] | @json)) as $keys
     | ($keys | length) != ($keys | unique | length);
   if type != "object" then "top-level value must be an object"
   elif has("rules") and (.rules | type) != "array" then "rules must be an array"
@@ -199,6 +201,49 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   else empty end
 ' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
 [ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
+
+hardcoded_models=$(jq -r '
+  def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
+  ([(.rules // [])[] | profiles(.use)[]] + profiles(.default // null))
+  | map(select(has("model") and .model != null))
+  | map("\(.harness):\(.model)")
+  | unique
+  | join(", ")
+' "$RULES" 2>/dev/null || true)
+
+tier_profiles=$(jq -r '
+  def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
+  ([(.rules // [])[] | profiles(.use)[]] + profiles(.default // null))
+  | map(select(has("tier") and .tier != null and (.model == null or .model == "")))
+  | map([.harness, .tier, (.effort // "")] | @tsv)
+  | unique[]
+' "$RULES" 2>/dev/null || true)
+
+if [ -n "$tier_profiles" ]; then
+  while IFS=$'\t' read -r tharness ttier teffort; do
+    [ -n "$tharness" ] || continue
+    resolved_model=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$tharness" "$ttier" "$teffort") || die "tier resolution failed for $tharness $ttier: could not resolve model"
+    RULES_TMP=$(mktemp) || die "mktemp failed"
+    if jq --arg h "$tharness" --arg t "$ttier" --arg e "$teffort" --arg m "$resolved_model" '
+      def update_profile($p):
+        if $p.harness == $h and $p.tier == $t and (($p.effort // "") == $e) and ($p.model == null or $p.model == "")
+        then $p + {model: $m}
+        else $p end;
+      def update_list($v):
+        if ($v | type) == "array" then map(update_profile(.))
+        elif ($v | type) == "object" then update_profile($v)
+        else $v end;
+      .rules = [(.rules // [])[] | .use = update_list(.use)]
+      | if has("default") then .default = update_list(.default) else . end
+    ' "$RULES" > "$RULES_TMP"; then
+      mv "$RULES_TMP" "$RULES" || die "failed to update rules with resolved tier model"
+    else
+      rm -f "$RULES_TMP"
+      die "failed to update rules with resolved tier model"
+    fi
+  done <<< "$tier_profiles"
+  chmod 400 "$RULES" || die "could not protect rules snapshot"
+fi
 
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -517,4 +562,7 @@ TEXT=$(jq -r '
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
+if [ -n "$hardcoded_models" ]; then
+  echo "warning: config/crew-dispatch.json contains hardcoded model id ($hardcoded_models); prefer 'tier' (strong, standard, fast)" >&2
+fi
 exit 0

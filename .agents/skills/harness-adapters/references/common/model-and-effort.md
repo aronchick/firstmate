@@ -5,7 +5,7 @@ Add `references/common/dispatch.md` for configured profile precedence.
 
 ## Axes and precedence
 
-`../../../bin/fm-spawn.sh` accepts concrete `--harness`, `--model`, and `--effort` values selected at intake; scripts never parse natural-language dispatch rules.
+`../../../bin/fm-spawn.sh` accepts concrete `--harness`, `--model` (or `--tier`), and `--effort` values selected at intake; scripts never parse natural-language dispatch rules.
 The tool reference records verified flags, accepted values, omission behavior, and discovery.
 
 Effort precedence is a per-task captain instruction, then applicable dispatch profile or secondmate pin, then the fallback below.
@@ -35,6 +35,11 @@ Establish it from the tool's discovery surface and `quota-axi auth --json` per-p
 
 Treat model and provider knowledge as current discovery, not a permanent namespace or mapping.
 Use the selected tool reference's authoritative surface in the current authenticated environment because availability changes by version, account, and configuration.
+
+Profiles in `config/crew-dispatch.json` name a tier (`strong`, `standard`, `fast`) and optional effort rather than hardcoding a model identifier.
+At spawn time, `bin/fm-spawn.sh` and `bin/fm-dispatch-resolve.sh` resolve the tier to the newest concrete model from that harness's live discovery surface.
+Discovery surfaces are `agy models`, the Codex cache at `${CODEX_HOME:-~/.codex}/models_cache.json`, Claude floating aliases `opus`/`sonnet`/`haiku`, and Kimi's catalog via `kimi provider list --json`.
+Never infer a model from a name; if discovery is unreachable, fail with the concrete missing requirement and do not fall back to a remembered model identifier.
 
 For an unfamiliar namespace, establish support and provider identity from that harness's CLI help, model listing, or current documentation.
 An account-reaching listing that omits a model is concrete unsupported evidence; block the candidate and quote it.

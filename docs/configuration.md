@@ -1110,13 +1110,13 @@ This section is the single owner of the canonical schema and its per-field seman
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
       "use": [
-        { "harness": "<adapter>", "model": "<optional model>", "effort": "<low|medium|high|xhigh|max|ultra, optional>", "provider": "<optional quota-axi provider>", "floor": { "scope": "<quota-axi scope>", "min_percent": 50 } }
+        { "harness": "<adapter>", "tier": "<strong|standard|fast>", "effort": "<low|medium|high|xhigh|max|ultra, optional>", "provider": "<optional quota-axi provider>", "floor": { "scope": "<quota-axi scope>", "min_percent": 50 } }
       ],
       "why": "<optional rationale that helps firstmate choose>"
     }
   ],
   "default": [
-    { "harness": "<adapter>", "model": "<optional model>", "effort": "<optional effort>" }
+    { "harness": "<adapter>", "tier": "<strong|standard|fast>", "effort": "<optional effort>" }
   ]
 }
 ```
@@ -1129,7 +1129,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | Rule `when` and `use` | Required for each rule. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
-| Profile `model` and `effort`; rule `why` | Optional. |
+| Profile `tier`, `model`, and `effort`; rule `why` | Recommended profile form: name `tier` (`strong`, `standard`, `fast`) and optional `effort`. Concrete `model` remains accepted for legacy profiles and explicit per-task captain overrides, but the resolver warns on hardcoded model IDs in `config/crew-dispatch.json`. |
 
 **Fields applied only by typed resolution**
 
@@ -1171,8 +1171,10 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 **Model, effort, and fallback behavior**
 
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/fm-harness.sh validate-native-effort` and `bin/fm-spawn.sh` respectively.
-- Codex `max` is valid when the profile selects `gpt-5.6-luna`, whose installed catalog entry supports that reasoning level.
-- An omitted model or effort means the selected harness uses its own default for that axis.
+- Codex `max` reasoning effort is derived from the installed model catalog at `${CODEX_HOME:-~/.codex}/models_cache.json`, which advertises supported reasoning levels per model.
+- At spawn time, `bin/fm-spawn.sh` and `bin/fm-dispatch-resolve.sh` resolve a profile's `tier` to the newest concrete model ID from that harness's live discovery surface (`agy models`, `${CODEX_HOME:-~/.codex}/models_cache.json`, Claude floating aliases `opus`/`sonnet`/`haiku`, and Kimi's catalog via `kimi provider list --json`).
+- If discovery is unreachable, spawn and resolution fail with the concrete missing requirement rather than falling back to a remembered model ID.
+- An omitted model, tier, or effort means the selected harness uses its own default for that axis.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
 - Every profile array is an implicit quota-aware choice resolved through `quota-array-dispatch`.
 - If no dispatch rule fits, firstmate resolves `default` through the same object-or-array path before falling back to `config/crew-harness`.
