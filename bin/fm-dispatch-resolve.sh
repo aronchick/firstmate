@@ -384,7 +384,9 @@ RESULT=$(jq -n --argjson resolved_models "$RESOLVED_MODELS" --arg floor "$CONFID
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
   def evaluate($profile):
-    ($profile + (if $profile.tier then {model: $resolved_models[([$profile.harness, $profile.tier, ($profile.effort // "")] | @json)]} else {} end)) as $c |
+    ($profile | if .model then del(.tier)
+      elif .tier then . + {model: $resolved_models[([.harness, .tier, (.effort // "")] | @json)]}
+      else . end) as $c |
     (provider_of($c)) as $p | (lane_of($c)) as $lane |
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then

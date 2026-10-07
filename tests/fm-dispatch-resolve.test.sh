@@ -1032,6 +1032,38 @@ assert_contains "$out" '  status: error' "unsupported tier effort cannot be rank
 assert_not_contains "$out" '  profile:' "unsupported tier effort cannot be recommended"
 assert_contains "$err" "does not support effort 'max'" "shared discovery reports unsupported effort"
 pass "dispatch refuses unsupported resolved effort before ranking"
+
+# A model pin overrides its tier for launch, quota matching, and effort checks.
+reset_log
+jq '.rules[3].use = {harness:"codex",tier:"strong",model:"gpt-6-luna",effort:"high"}' "$BASE_RULES" > "$RULES"
+printf '%s\n' '{"models":[]}' > "$TMP_ROOT/codex-home/models_cache.json"
+CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "pinned dispatch exits 0 without tier candidates"
+assert_contains "$out" '  status: clear' "a pin does not require tier discovery"
+assert_contains "$out" "profile: --harness 'codex' --model 'gpt-6-luna' --effort 'high'" "launch retains the explicit pin"
+assert_not_contains "$out" ' --tier ' "the overridden tier is not forwarded"
+
+printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]},{"slug":"gpt-6-luna","supported_reasoning_levels":[{"effort":"high"},{"effort":"max"}]}]}' > "$TMP_ROOT/codex-home/models_cache.json"
+jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability) += [
+  {scope:"model:gpt-6-luna",status:"known",effectivePercentRemaining:80,runway:{status:"through_reset"},selection:{spendPriority:0.5}},
+  {scope:"model:gpt-9-astra",status:"known",effectivePercentRemaining:0,runway:{status:"exhausted_now"},selection:{spendPriority:0}}
+]' "$QUOTA" > "$TMP_ROOT/pinned-quota.json"
+jq '.rules[3].use.effort = "max"' "$RULES" > "$TMP_ROOT/pinned-rules.json"
+cp "$TMP_ROOT/pinned-rules.json" "$RULES"
+QUOTA_AXI_FIXTURE="$TMP_ROOT/pinned-quota.json" CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "pinned max effort exits 0"
+assert_contains "$out" '  status: clear' "pin effort support and quota win over the tier model"
+assert_contains "$out" 'candidate: codex:gpt-6-luna' "quota evidence names the pin"
+assert_contains "$out" 'model:gpt-6-luna:80%/through_reset' "quota evidence includes the pinned model scope"
+assert_not_contains "$out" 'gpt-9-astra' "the tier model does not affect quota eligibility"
+assert_contains "$out" "profile: --harness 'codex' --model 'gpt-6-luna' --effort 'max'" "supported pin effort is forwarded"
+
+printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"max"}]},{"slug":"gpt-6-luna","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$TMP_ROOT/codex-home/models_cache.json"
+CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 2 "$code" "unsupported pinned effort is rejected"
+assert_contains "$err" 'each use profile effort must be supported by its harness and model' "tier effort support cannot override the pin"
+assert_not_contains "$out" '  profile:' "unsupported pin effort is not recommended"
+pass "explicit model pins override tiers for discovery, launch, quota, and effort"
 cp "$BASE_RULES" "$RULES"
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "legacy model profiles remain selectable"
