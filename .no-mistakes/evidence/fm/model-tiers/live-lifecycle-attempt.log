@@ -1,0 +1,9 @@
+/Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M49YXZT7H62C6CAE1M2WJPCA/.phase-tmp/live-home
+/Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M49YXZT7H62C6CAE1M2WJPCA/.phase-tmp/live-child
+Live dispatch opt-in check:
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M49YXZT7H62C6CAE1M2WJPCA/.phase-tmp/live-home/.env)
+exit=0
+Live local secondmate spawn attempt (healthy Kimi tier):
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M49YXZT7H62C6CAE1M2WJPCA/.phase-tmp/live-home
+error: secondmate home cannot be inside the firstmate repo: /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M49YXZT7H62C6CAE1M2WJPCA/.phase-tmp/live-child
+exit=1

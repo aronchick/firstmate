@@ -1,0 +1,9 @@
+Unsupported real Codex fast/ultra:
+error: codex model 'gpt-6-luna' does not support effort 'ultra'
+exit=1
+Invalid tier:
+error: invalid tier 'nonexistent'; must be strong, standard, or fast
+exit=1
+Unavailable agy discovery:
+error: agy model discovery is unreachable (agy binary not found on PATH)
+exit=1

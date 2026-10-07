@@ -1,0 +1,24 @@
+codex strong: gpt-6-astra
+exit=0
+codex standard: gpt-6.1-sol
+exit=0
+codex fast: gpt-6-luna
+exit=0
+claude strong: opus
+exit=0
+claude standard: sonnet
+exit=0
+claude fast: haiku
+exit=0
+agy strong: gemini-3.1-pro-high
+exit=0
+agy standard: gemini-3.8-flash-high
+exit=0
+agy fast: gemini-3.8-flash-low
+exit=0
+kimi strong: kimi-code/k3
+exit=0
+kimi standard: kimi-code/kimi-for-coding
+exit=0
+kimi fast: kimi-code/kimi-for-coding-highspeed
+exit=0
