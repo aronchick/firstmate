@@ -50,6 +50,16 @@ fm_model_tier_resolve_claude() {
   esac
 }
 
+fm_model_tier_newest() {
+  jq -Rsr '
+    def generation:
+      [capture("(?:^|[-/])k?(?<version>[0-9]+(?:\\.[0-9]+)*)(?:[-/]|$)"; "i").version
+        | split(".") | map(tonumber)] | first // [];
+    split("\n") | map(select(length > 0))
+    | sort_by(generation, -length, .) | last // empty
+  '
+}
+
 fm_model_tier_resolve_codex() {
   local tier=$1 effort=${2:-}
   local cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
@@ -67,20 +77,20 @@ fm_model_tier_resolve_codex() {
   strong)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("astra|strong|frontier"; "i")) or ((.description // "") | test("frontier"; "i"))))]
-        | min_by(.priority // 999) | .slug) // empty
-    ' "$cache" 2>/dev/null || true)
+        | .[].slug)
+    ' "$cache" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   standard)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("sol|standard|workhorse"; "i")) or ((.description // "") | test("workhorse"; "i"))))]
-        | min_by(.priority // 999) | .slug) // empty
-    ' "$cache" 2>/dev/null || true)
+        | .[].slug)
+    ' "$cache" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   fast)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("luna|fast|mini"; "i")) or ((.description // "") | test("fast"; "i"))))]
-        | min_by(.priority // 999) | .slug) // empty
-    ' "$cache" 2>/dev/null || true)
+        | .[].slug)
+    ' "$cache" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   esac
 
@@ -113,25 +123,19 @@ fm_model_tier_resolve_agy() {
 
   case "$tier" in
   strong)
-    if [ -n "$effort" ]; then
-      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(pro|opus|strong)-${effort}$" | head -n 1 || true)
-    fi
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(pro|opus|strong)-${target_effort}$" | head -n 1 || true)
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(pro|opus|strong)" | head -n 1 || true)
+    resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(pro|opus|strong)-${target_effort}$" | fm_model_tier_newest || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(pro|opus|strong)" | fm_model_tier_newest || true)
     ;;
   standard)
-    if [ -n "$effort" ]; then
-      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${effort}$" | head -n 1 || true)
-    fi
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${target_effort}$" | head -n 1 || true)
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)" | grep -Eiv -- "-(flash|sonnet|standard)-(lite|low)-" | head -n 1 || true)
+    resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${target_effort}$" | fm_model_tier_newest || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)" | grep -Eiv -- "-(flash|sonnet|standard)-(lite|low)-" | fm_model_tier_newest || true)
     ;;
   fast)
     if [ -n "$effort" ]; then
-      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash.*lite|flash.*low|fast|haiku)-${effort}$" | head -n 1 || true)
+      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash.*lite|flash.*low|fast|haiku)-${effort}$" | fm_model_tier_newest || true)
     fi
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash-low|flash.*lite|fast|haiku)" | head -n 1 || true)
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-low$" | head -n 1 || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash-low|flash.*lite|fast|haiku)" | fm_model_tier_newest || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-low$" | fm_model_tier_newest || true)
     ;;
   esac
 
@@ -164,24 +168,18 @@ fm_model_tier_resolve_kimi() {
   case "$tier" in
   strong)
     resolved=$(jq -r '
-      def generation:
-        .key | [capture("(?:^|/)k(?<generation>[0-9]+)(?:[-.]|$)"; "i").generation | tonumber] | first // 0;
-      [.models | to_entries[] | select(generation >= 3 or (.key | test("strong|frontier"; "i")))]
-      | sort_by(-generation, -(.value.maxContextSize // 0), .key)
-      | first | .key // empty
-    ' <<<"$listing" 2>/dev/null || true)
+      .models | keys[] | select(test("(?:^|/)k(?:[3-9]|[1-9][0-9]+)(?:[-.]|$)|strong|frontier"; "i"))
+    ' <<<"$listing" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   standard)
     resolved=$(jq -r '
-      [.models | keys[] | select((test("kimi-for-coding|standard|workhorse"; "i")) and (test("highspeed|fast"; "i") | not))]
-      | first // empty
-    ' <<<"$listing" 2>/dev/null || true)
+      .models | keys[] | select((test("kimi-for-coding|standard|workhorse"; "i")) and (test("highspeed|fast"; "i") | not))
+    ' <<<"$listing" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   fast)
     resolved=$(jq -r '
-      [.models | keys[] | select(test("highspeed|fast|mini"; "i"))]
-      | first // empty
-    ' <<<"$listing" 2>/dev/null || true)
+      .models | keys[] | select(test("highspeed|fast|mini"; "i"))
+    ' <<<"$listing" 2>/dev/null | fm_model_tier_newest || true)
     ;;
   esac
 

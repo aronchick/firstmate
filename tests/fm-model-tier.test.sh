@@ -126,6 +126,28 @@ JSON
   pass "tier resolves to newest id in codex catalog"
 }
 
+test_codex_generation_beats_catalog_order() {
+  local home="$TMP_ROOT/codex-generation" tier family resolved
+  mkdir -p "$home"
+  for tier in strong standard fast; do
+    case "$tier" in
+    strong) family=astra ;;
+    standard) family=sol ;;
+    fast) family=luna ;;
+    esac
+    jq -n --arg family "$family" '
+      {models: [
+        {slug: ("gpt-9-" + $family), priority: 0},
+        {slug: ("gpt-10-" + $family), priority: 1},
+        {slug: ("gpt-10.1-" + $family), priority: 99}
+      ]}
+    ' > "$home/models_cache.json"
+    resolved=$(CODEX_HOME="$home" "$MODEL_TIER" resolve codex "$tier")
+    assert_equals "gpt-10.1-$family" "$resolved" "codex $tier ranks numeric generation before order or priority"
+  done
+  pass "codex generations outrank catalog order"
+}
+
 test_new_top_model_picked_up_with_no_config_edit() {
   local codex_home="$TMP_ROOT/codex-test-2"
   mkdir -p "$codex_home"
@@ -204,6 +226,11 @@ gemini-3.9-pro-medium
 gemini-3.9-flash-high
 gemini-3.9-flash-low
 gemini-3.9-flash-lite-high
+gemini-3.10-pro-high
+gemini-3.10-pro-medium
+gemini-3.10-flash-high
+gemini-3.10-flash-low
+gemini-3.10-flash-lite-high
 EOF
   exit 0
 fi
@@ -213,16 +240,16 @@ SH
 
   local strong standard fast
   strong=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy strong high)
-  assert_equals "gemini-3.9-pro-high" "$strong" "agy strong resolves to gemini-3.9-pro-high"
+  assert_equals "gemini-3.10-pro-high" "$strong" "agy strong selects the newer generation listed last"
 
   standard=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy standard high)
-  assert_equals "gemini-3.9-flash-high" "$standard" "agy standard resolves to gemini-3.9-flash-high"
+  assert_equals "gemini-3.10-flash-high" "$standard" "agy standard selects the newer generation listed last"
 
   standard=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy standard low)
-  assert_equals "gemini-3.9-flash-low" "$standard" "standard preserves requested low effort"
+  assert_equals "gemini-3.10-flash-low" "$standard" "standard preserves requested low effort"
 
   fast=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy fast high)
-  assert_equals "gemini-3.9-flash-lite-high" "$fast" "agy fast resolves to gemini-3.9-flash-lite-high"
+  assert_equals "gemini-3.10-flash-lite-high" "$fast" "agy fast selects the newer generation listed last"
 
   pass "agy tier resolves from live models listing"
 }
@@ -256,7 +283,7 @@ SH
 
   local strong standard
   strong=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve kimi strong)
-  assert_equals "kimi-code/k3" "$strong" "kimi strong resolves to 1M context k3"
+  assert_equals "kimi-code/k3" "$strong" "kimi strong resolves to the unqualified k3 model"
 
   standard=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve kimi standard)
   assert_equals "kimi-code/kimi-for-coding" "$standard" "kimi standard resolves to kimi-for-coding"
@@ -264,7 +291,7 @@ SH
   pass "kimi tier resolves from live provider catalog"
 }
 
-test_kimi_strong_prefers_newer_generation() {
+test_kimi_tiers_prefer_newer_generation() {
   local fakebin="$TMP_ROOT/fake-kimi-generation"
   mkdir -p "$fakebin"
   cat > "$fakebin/kimi" <<'SH'
@@ -277,21 +304,28 @@ exit 1
 SH
   chmod +x "$fakebin/kimi"
 
-  local generation context resolved catalog="$fakebin/catalog.json"
-  for generation in 4 10; do
-    for context in 1048576 262144; do
-      jq -n --arg newer "kimi-code/k$generation" --argjson context "$context" '
+  local tier suffix generation context resolved catalog="$fakebin/catalog.json"
+  for tier in strong standard fast; do
+    case "$tier" in
+    strong) suffix= ;;
+    standard) suffix=-standard ;;
+    fast) suffix=-fast ;;
+    esac
+    for generation in 4 10; do
+      for context in 1048576 262144; do
+        jq -n --arg older "kimi-code/k3$suffix" --arg newer "kimi-code/k$generation$suffix" --argjson context "$context" '
         {models: {
-          "kimi-code/k3": {maxContextSize: 1048576},
+          ($older): {maxContextSize: 1048576},
           ($newer): {maxContextSize: $context}
         }}
-      ' > "$catalog"
-      resolved=$(KIMI_BIN="$fakebin/kimi" KIMI_TEST_CATALOG="$catalog" "$MODEL_TIER" resolve kimi strong)
-      assert_equals "kimi-code/k$generation" "$resolved" "generation $generation wins with context $context"
+        ' > "$catalog"
+        resolved=$(KIMI_BIN="$fakebin/kimi" KIMI_TEST_CATALOG="$catalog" "$MODEL_TIER" resolve kimi "$tier")
+        assert_equals "kimi-code/k$generation$suffix" "$resolved" "$tier generation $generation wins with context $context"
+      done
     done
   done
 
-  pass "kimi strong prefers newer generations over context size"
+  pass "kimi tiers prefer newer generations over context size"
 }
 
 test_unreachable_discovery_refuses() {
@@ -429,11 +463,12 @@ test_hidden_models_are_not_tier_candidates() {
 }
 
 test_tier_resolves_to_newest_model_codex
+test_codex_generation_beats_catalog_order
 test_new_top_model_picked_up_with_no_config_edit
 test_tier_resolves_claude_floating_aliases
 test_tier_resolves_agy_live_listing
 test_tier_resolves_kimi_live_catalog
-test_kimi_strong_prefers_newer_generation
+test_kimi_tiers_prefer_newer_generation
 test_unreachable_discovery_refuses
 test_legacy_model_profile_still_launches
 test_tier_profile_launches_resolved_model

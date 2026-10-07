@@ -376,6 +376,7 @@ test_relaunch_discovers_the_recorded_tier_again() {
   printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$dir/user-home/.codex/models_cache.json"
   out=$(CODEX_HOME="$dir/user-home/.codex" run_control "$dir" rl-tier relaunch --note "continue task"); rc=$?
   expect_code 0 "$rc" "tier replacement should succeed: $out"
+  assert_contains "$out" "model=gpt-9-astra" "receipt must report the confirmed replacement model"
   assert_grep 'tier=strong' "$dir/home/state/rl-tier.meta" "replacement lost tier"
   assert_grep 'model=gpt-9-astra' "$dir/home/state/rl-tier.meta" "replacement reused the old model"
   assert_grep "codex --model 'gpt-9-astra'" "$dir/fake/literal" "replacement did not launch discovered model"
