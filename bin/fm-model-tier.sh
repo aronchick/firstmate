@@ -192,9 +192,9 @@ fm_model_tier_resolve_kimi() {
 
 fm_model_tier_resolve() {
   local harness=$1 tier=$2 effort=${3:-}
-  local canonical
+  local canonical resolved
   canonical=$(fm_model_tier_canonical "$tier") || return 1
-  case "$harness" in
+  resolved=$(case "$harness" in
   claude) fm_model_tier_resolve_claude "$canonical" "$effort" ;;
   codex) fm_model_tier_resolve_codex "$canonical" "$effort" ;;
   agy) fm_model_tier_resolve_agy "$canonical" "$effort" ;;
@@ -203,7 +203,12 @@ fm_model_tier_resolve() {
     echo "error: harness '$harness' does not support tier resolution" >&2
     return 1
     ;;
-  esac
+  esac) || return 1
+  if [ -n "$effort" ] && ! fm_model_catalog_supports_effort "$harness" "$resolved" "$effort"; then
+    echo "error: $harness model '$resolved' does not support effort '$effort'" >&2
+    return 1
+  fi
+  printf '%s\n' "$resolved"
 }
 
 fm_model_catalog_supports_effort() {

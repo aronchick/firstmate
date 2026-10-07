@@ -1129,7 +1129,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | Rule `when` and `use` | Required for each rule. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
-| Profile `tier`, `model`, and `effort`; rule `why` | Recommended profile form: name `tier` (`strong`, `standard`, `fast`) and optional `effort`. Concrete `model` remains accepted for legacy profiles and explicit per-task captain overrides, but the resolver warns on hardcoded model IDs in `config/crew-dispatch.json`. |
+| Profile `tier`, `model`, and `effort`; rule `why` | Recommended profile form: name `tier` (`strong`, `standard`, `fast`) and optional `effort`. Concrete `model` remains accepted for legacy profiles and explicit per-task captain overrides. |
 
 **Fields applied only by typed resolution**
 

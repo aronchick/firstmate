@@ -949,9 +949,10 @@ resolve_relaunch_profile() {
     TARGET_MODEL=default
   fi
   TARGET_TIER=
-  if [ "$TIER_SET" = 1 ]; then
+  if [ "$MODEL_SET" = 0 ] && [ "$TIER_SET" = 1 ]; then
     TARGET_TIER=$NEW_TIER
-  elif [ "$MODEL_SET" = 0 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
+  elif [ "$MODEL_SET" = 0 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ] \
+       && { [ "$HARNESS_SET" = 1 ] || [ -z "$CONFIG_MODEL" ] || [ "$CONFIG_MODEL" = default ]; }; then
     TARGET_TIER=$(fm_meta_get "$META" tier)
   fi
   case "$TARGET_TIER" in

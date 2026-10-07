@@ -202,15 +202,6 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --argjson c
 ' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
 [ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
 
-hardcoded_models=$(jq -r '
-  def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
-  ([(.rules // [])[] | profiles(.use)[]] + profiles(.default // null))
-  | map(select(has("model") and .model != null))
-  | map("\(.harness):\(.model)")
-  | unique
-  | join(", ")
-' "$RULES" 2>/dev/null || true)
-
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   ((.rules // [])[] | profiles(.use)[] | select(has("provider") | not) | "use\t\(.harness)"),
@@ -545,7 +536,4 @@ TEXT=$(jq -r '
          elif .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
-if [ -n "$hardcoded_models" ]; then
-  echo "warning: config/crew-dispatch.json contains hardcoded model id ($hardcoded_models); prefer 'tier' (strong, standard, fast)" >&2
-fi
 exit 0

@@ -1033,11 +1033,7 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
-  if [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] && [ "$harness" = "$(fm_meta_get "$STATE/$id.meta" harness)" ]; then
-    TIER=$(fm_meta_get "$STATE/$id.meta" tier)
-  fi
   model=${MODEL:--}
-  [ -z "$TIER" ] || model=-
   effort=${EFFORT:--}
   if [ -z "$HARNESS_ARG" ] && [ -z "$positional" ]; then
     if [ "$MODEL_SET" -eq 0 ] && [ -z "$TIER" ]; then
@@ -1049,6 +1045,13 @@ spawn_remote_secondmate() {
       [ -n "$effort" ] || effort=-
     fi
   fi
+  [ "$MODEL_SET" -eq 0 ] || TIER=
+  if [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] \
+     && { [ "$model" = - ] || [ "$model" = default ]; } \
+     && [ "$harness" = "$(fm_meta_get "$STATE/$id.meta" harness)" ]; then
+    TIER=$(fm_meta_get "$STATE/$id.meta" tier)
+  fi
+  [ -z "$TIER" ] || model=-
   # A remote second mate always runs on Herdr: its server belongs to the host's
   # own GUI login session, so the endpoint outlives every SSH connection that
   # supervises it. bin/fm-remote-doctor.sh gates that host on the same
@@ -2418,11 +2421,6 @@ if [ "$KIND" != secondmate ]; then
   EXCLUDE_TOOLS=$(fm_exclude_tools_check "$HARNESS" "$RAW_LAUNCH" "$CONFIG") || exit 1
 fi
 
-
-if { [ "$RELAUNCH" -eq 1 ] || [ "$KIND" = secondmate ]; } && [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = "$(fm_meta_get "$STATE/$ID.meta" harness)" ]; then
-  TIER=$(fm_meta_get "$STATE/$ID.meta" tier)
-fi
-
 case "$HARNESS" in
 devin)
   DEVIN_BIN=$(command -v devin) || {
@@ -2510,12 +2508,16 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
+[ "$MODEL_SET" -eq 0 ] || TIER=
+if { [ "$RELAUNCH" -eq 1 ] || [ "$KIND" = secondmate ]; } \
+   && [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] \
+   && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; } \
+   && [ "$HARNESS" = "$(fm_meta_get "$STATE/$ID.meta" harness)" ]; then
+  TIER=$(fm_meta_get "$STATE/$ID.meta" tier)
+fi
 if [ -n "$TIER" ]; then
   MODEL=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$HARNESS" "$TIER" "${EFFORT:-}") || exit 1
   MODEL_SET=1
-  if [ "$HARNESS" = codex ] && [ "$EFFORT" = max ]; then
-    "$SCRIPT_DIR/fm-model-tier.sh" supports-effort codex "$MODEL" max || exit 1
-  fi
 fi
 
 # Ultra is an explicit native capability, never a Pi thinking-level alias.

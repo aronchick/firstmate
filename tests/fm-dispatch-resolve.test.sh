@@ -1025,5 +1025,18 @@ assert_contains "$out" "candidate: codex:gpt-9-astra" "quota evidence uses disco
 assert_contains "$out" "profile: --harness 'codex' --tier 'strong' --effort 'max'" "launch profile retains tier"
 assert_absent "$LOG/discovery-agy" "unselected rules and default must not discover models"
 pass "dispatch resolves only selected candidates and forwards their tiers"
+printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$TMP_ROOT/codex-home/models_cache.json"
+CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "unsupported tier effort uses dispatch error interface"
+assert_contains "$out" '  status: error' "unsupported tier effort cannot be ranked"
+assert_not_contains "$out" '  profile:' "unsupported tier effort cannot be recommended"
+assert_contains "$err" "does not support effort 'max'" "shared discovery reports unsupported effort"
+pass "dispatch refuses unsupported resolved effort before ranking"
+cp "$BASE_RULES" "$RULES"
+TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "legacy model profiles remain selectable"
+assert_not_contains "$err" 'hardcoded model' "legacy profiles do not introduce warning output"
+pass "legacy model profiles remain compatible without warnings"
+
 
 printf '# all fm-dispatch-resolve tests passed\n'

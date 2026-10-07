@@ -340,40 +340,6 @@ test_tier_profile_launches_resolved_model() {
   pass "tier profile resolves model and launches"
 }
 
-test_resolver_warns_on_hardcoded_model_id() {
-  local home="$TMP_ROOT/resolver-home"
-  local brief="$TMP_ROOT/resolver-brief.md"
-  mkdir -p "$home/config" "$home/state" "$home/data"
-  cat > "$brief" <<'MD'
-# Task
-## Captain's intent
-Mechanical fix.
-## Firstmate spec
-Do the fix.
-MD
-  cat > "$home/config/crew-dispatch.json" <<'JSON'
-{
-  "rules": [
-    {
-      "when": "Mechanical fix",
-      "use": { "harness": "claude", "model": "haiku", "effort": "low" }
-    }
-  ]
-}
-JSON
-
-  local out err code
-  code=0
-  out=$(TYPESAFE_API_KEY="" FM_HOME="$home" "$RESOLVE" "$brief" 2>"$TMP_ROOT/resolve.err") || code=$?
-  err=$(cat "$TMP_ROOT/resolve.err")
-
-  # When off, resolver does not emit warning
-  assert_not_contains "$err" "warning: config/crew-dispatch.json contains hardcoded model id" \
-    "resolver off should not warn on hardcoded model"
-
-  pass "resolver warns only on active resolution of hardcoded model id"
-}
-
 test_catalog_derived_effort_support() {
   local codex_home="$TMP_ROOT/codex-catalog"
   mkdir -p "$codex_home"
@@ -440,7 +406,6 @@ test_tier_resolves_kimi_live_catalog
 test_unreachable_discovery_refuses
 test_legacy_model_profile_still_launches
 test_tier_profile_launches_resolved_model
-test_resolver_warns_on_hardcoded_model_id
 test_catalog_derived_effort_support
 test_hidden_models_are_not_tier_candidates
 test_tier_refuses_unsupported_resolved_effort

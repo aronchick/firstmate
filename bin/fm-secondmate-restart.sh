@@ -283,7 +283,8 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     [ -n "${HARNESS[i]}" ] || HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
     MODEL[i]=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model 2>/dev/null || true)
     EFFORT[i]=$("$SCRIPT_DIR/fm-harness.sh" secondmate-effort 2>/dev/null || true)
-    if [ "${HARNESS[i]}" = "$FM_SECONDMATE_RESTART_HARNESS" ]; then
+    if [ "${HARNESS[i]}" = "$FM_SECONDMATE_RESTART_HARNESS" ] \
+       && { [ -z "${MODEL[i]}" ] || [ "${MODEL[i]}" = default ]; }; then
       TIER[i]=$(fm_meta_get "$STATE/$id.meta" tier)
     fi
     case "${EFFORT[i]}" in

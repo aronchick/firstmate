@@ -372,7 +372,7 @@ test_relaunch_discovers_the_recorded_tier_again() {
   printf codex > "$dir/fake/becomes"
   printf 'model=gpt-5-astra\ntier=strong\neffort=high\n' >> "$dir/home/state/rl-tier.meta"
   mkdir -p "$dir/user-home/.codex"
-  printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier"}]}' > "$dir/user-home/.codex/models_cache.json"
+  printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$dir/user-home/.codex/models_cache.json"
   out=$(CODEX_HOME="$dir/user-home/.codex" run_control "$dir" rl-tier relaunch --note "continue task"); rc=$?
   expect_code 0 "$rc" "tier replacement should succeed: $out"
   assert_grep 'tier=strong' "$dir/home/state/rl-tier.meta" "replacement lost tier"
@@ -1000,6 +1000,51 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
     || fail "the configured effort token should come with the pin"
   assert_not_contains "$out" "not a verified harness" "codex is a verified harness"
   pass "fm-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
+}
+
+test_secondmate_model_pin_overrides_recorded_tier() {
+  local dir home out rc
+  dir=$(new_case smtierpin sm3)
+  home="$dir/home"
+  mkdir -p "$home/config"
+  printf 'codex gpt-6-luna high\n' > "$home/config/secondmate-harness"
+  mkdir -p "$home/data/sm3"
+  printf '# secondmate brief\n' > "$home/data/sm3/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'sm3\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-sm3"
+    echo "endpoint_task_id=sm3"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=codex"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=gpt-6-astra"
+    echo "tier=strong"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/sm3.meta"
+  printf '%s\n' "fm-sm3" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  printf 'codex' > "$dir/fake/becomes"
+  printf codex > "$dir/fake/command"
+  out=$(run_control "$dir" sm3 relaunch); rc=$?
+  expect_code 0 "$rc" "a configured secondmate harness should relaunch"$'\n'"$out"
+  [ "$(journal_field "$dir" sm3 to_harness)" = codex ] \
+    || fail "a secondmate relaunch should pick up the configured harness pin, got '$(journal_field "$dir" sm3 to_harness)'"
+  [ "$(journal_field "$dir" sm3 to_model)" = gpt-6-luna ] \
+    || fail "the configured model token should come with the pin"
+  [ "$(journal_field "$dir" sm3 to_effort)" = high ] \
+    || fail "the configured effort token should come with the pin"
+  assert_not_contains "$out" "not a verified harness" "codex is a verified harness"
+  [ -z "$(meta_field "$dir" sm3 tier)" ] || fail "configured model must clear the inherited tier"
+  assert_grep 'model=gpt-6-luna' "$home/state/sm3.meta" "configured model was not persisted"
+  assert_grep "codex --model 'gpt-6-luna'" "$dir/fake/literal" "configured model was not launched"
+  pass "secondmate model pin overrides the recorded tier"
 }
 
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
@@ -2531,6 +2576,7 @@ test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter
 test_secondmate_relaunch_picks_up_the_configured_harness_pin
+test_secondmate_model_pin_overrides_recorded_tier
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop
 test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes
