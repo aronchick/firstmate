@@ -264,6 +264,36 @@ SH
   pass "kimi tier resolves from live provider catalog"
 }
 
+test_kimi_strong_prefers_newer_generation() {
+  local fakebin="$TMP_ROOT/fake-kimi-generation"
+  mkdir -p "$fakebin"
+  cat > "$fakebin/kimi" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "provider list --json" ]; then
+  cat "$KIMI_TEST_CATALOG"
+  exit 0
+fi
+exit 1
+SH
+  chmod +x "$fakebin/kimi"
+
+  local generation context resolved catalog="$fakebin/catalog.json"
+  for generation in 4 10; do
+    for context in 1048576 262144; do
+      jq -n --arg newer "kimi-code/k$generation" --argjson context "$context" '
+        {models: {
+          "kimi-code/k3": {maxContextSize: 1048576},
+          ($newer): {maxContextSize: $context}
+        }}
+      ' > "$catalog"
+      resolved=$(KIMI_BIN="$fakebin/kimi" KIMI_TEST_CATALOG="$catalog" "$MODEL_TIER" resolve kimi strong)
+      assert_equals "kimi-code/k$generation" "$resolved" "generation $generation wins with context $context"
+    done
+  done
+
+  pass "kimi strong prefers newer generations over context size"
+}
+
 test_unreachable_discovery_refuses() {
   local out status
 
@@ -403,6 +433,7 @@ test_new_top_model_picked_up_with_no_config_edit
 test_tier_resolves_claude_floating_aliases
 test_tier_resolves_agy_live_listing
 test_tier_resolves_kimi_live_catalog
+test_kimi_strong_prefers_newer_generation
 test_unreachable_discovery_refuses
 test_legacy_model_profile_still_launches
 test_tier_profile_launches_resolved_model

@@ -164,8 +164,10 @@ fm_model_tier_resolve_kimi() {
   case "$tier" in
   strong)
     resolved=$(jq -r '
-      [.models | to_entries[] | select(.key | test("k[3-9]|strong|frontier"; "i"))]
-      | sort_by(-(.value.maxContextSize // 0), .key)
+      def generation:
+        .key | [capture("(?:^|/)k(?<generation>[0-9]+)(?:[-.]|$)"; "i").generation | tonumber] | first // 0;
+      [.models | to_entries[] | select(generation >= 3 or (.key | test("strong|frontier"; "i")))]
+      | sort_by(-generation, -(.value.maxContextSize // 0), .key)
       | first | .key // empty
     ' <<<"$listing" 2>/dev/null || true)
     ;;
