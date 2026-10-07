@@ -45,6 +45,7 @@ relaunch_cleanup() {
   for d in "${TASK_TMPS[@]:-}"; do
     [ -n "$d" ] && rm -rf "$d"
   done
+  find "$TMP_ROOT" -type d -name '*.git-hooks' -exec chmod u+w {} +
   rm -rf "$TMP_ROOT"
 }
 trap relaunch_cleanup EXIT
@@ -1053,7 +1054,10 @@ test_secondmate_model_pin_overrides_recorded_tier() {
   printf '%s' "$dir/smhome" > "$dir/fake/cwd"
   printf 'codex' > "$dir/fake/becomes"
   printf codex > "$dir/fake/command"
-  out=$(run_control "$dir" sm3 relaunch); rc=$?
+  # Keep the fixture home outside its fixture code root even with a
+  # worktree-local TMPDIR; the real spawn rejects nested secondmate homes.
+  ln -s "$ROOT/bin" "$dir/proj/bin"
+  out=$(FM_ROOT_OVERRIDE="$dir/proj" run_control "$dir" sm3 relaunch); rc=$?
   expect_code 0 "$rc" "a configured secondmate harness should relaunch"$'\n'"$out"
   [ "$(journal_field "$dir" sm3 to_harness)" = codex ] \
     || fail "a secondmate relaunch should pick up the configured harness pin, got '$(journal_field "$dir" sm3 to_harness)'"
