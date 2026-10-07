@@ -17,8 +17,8 @@
 #   agy    - agy models
 #   kimi   - kimi provider list --json
 #
-# Never infers a model from a name. If discovery is unreachable, fails with the
-# concrete missing requirement and never falls back to a remembered model id.
+# Selects only candidates from the discovery surface. If discovery is unreachable,
+# fails with the concrete missing requirement rather than a remembered model id.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

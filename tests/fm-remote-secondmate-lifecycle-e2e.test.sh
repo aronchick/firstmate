@@ -358,17 +358,23 @@ if [ "${1:-}" = --model-tiers-only ]; then
     || fail "host-local discovery launch failed"
   assert_grep 'model=gpt-9-astra' "$PARENT/state/ios.meta" "parent did not record host discovery"
   assert_grep 'tier=strong' "$REMOTE_HOME/state/parent-route/ios.meta" "host lost the launch tier"
+  printf 'Simulated SSH, Herdr, and harness; real product scripts. Host launch record:\n'
+  cat "$REMOTE_HOME/state/parent-route/ios.meta"
   printf '%s\n' '{"models":[{"slug":"gpt-10-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$TMP_ROOT/codex-home/models_cache.json"
   remote_env "$ROOT/bin/fm-remote-secondmate-relaunch.sh" ios codex default high strong >/dev/null \
     || fail "host-local tier replacement failed"
   assert_grep 'model=gpt-10-astra' "$PARENT/state/ios.meta" "replacement reused the old model"
   assert_grep 'model=gpt-10-astra' "$REMOTE_HOME/state/parent-route/ios.meta" "host did not rediscover the tier"
   assert_grep 'tier=strong' "$PARENT/state/ios.meta" "replacement lost the tier"
+  printf 'Host replacement record after catalog update:\n'
+  cat "$REMOTE_HOME/state/parent-route/ios.meta"
   remote_env "$ROOT/bin/fm-remote-secondmate-relaunch.sh" ios codex gpt-6-luna high >/dev/null \
     || fail "pinned host-local replacement failed"
   assert_grep 'model=gpt-6-luna' "$REMOTE_HOME/state/parent-route/ios.meta" "host ignored the model pin"
   assert_no_grep '^tier=' "$REMOTE_HOME/state/parent-route/ios.meta" "host retained an overridden tier"
   assert_no_grep '^tier=' "$PARENT/state/ios.meta" "parent retained an overridden tier"
+  printf 'Host replacement record after explicit model pin:\n'
+  cat "$REMOTE_HOME/state/parent-route/ios.meta"
   remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh retire ios --force >/dev/null \
     || fail "could not retire the simulated remote endpoint"
   pass "simulated remote launch and replacement use host discovery and preserve pins"

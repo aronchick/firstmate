@@ -2573,6 +2573,13 @@ SH
   pass "fm-control exit removes the dialog file before it releases the control lock"
 }
 
+if [ "${1:-}" = --model-tiers-only ]; then
+  test_relaunch_discovers_the_recorded_tier_again
+  test_relaunch_refuses_unsupported_tier_effort_before_stop
+  test_secondmate_model_pin_overrides_recorded_tier
+  exit 0
+fi
+
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
 test_relaunch_discovers_the_recorded_tier_again

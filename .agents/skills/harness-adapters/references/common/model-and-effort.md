@@ -18,7 +18,8 @@ If an adapter lacks `xhigh`, cap at its highest supported non-`max` level rather
 Never select `max` through this fallback; only an explicit per-task or standing captain preference permits it.
 
 The explicit native `ultra` value follows the model-scoped refusal contract in `../../../bin/fm-harness.sh validate-native-effort`; it is never silently omitted or mapped to a Pi level.
-For other values, if requested effort is outside the adapter's accepted set, the spawn records `effort=` in task metadata but emits no effort flag.
+Tier profiles follow the [configuration owner's resolved-effort checks](../../../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).
+For other profiles and values, if requested effort is outside the adapter's accepted set, the spawn records `effort=` in task metadata but emits no effort flag.
 This preserves launch success instead of passing a known-bad value.
 A harness with no verified interactive effort flag follows the same record-and-omit contract.
 
@@ -36,10 +37,7 @@ Establish it from the tool's discovery surface and `quota-axi auth --json` per-p
 Treat model and provider knowledge as current discovery, not a permanent namespace or mapping.
 Use the selected tool reference's authoritative surface in the current authenticated environment because availability changes by version, account, and configuration.
 
-Profiles in `config/crew-dispatch.json` name a tier (`strong`, `standard`, `fast`) and optional effort rather than hardcoding a model identifier.
-At spawn time, `bin/fm-spawn.sh` and `bin/fm-dispatch-resolve.sh` resolve the tier to the newest concrete model from that harness's live discovery surface.
-Discovery surfaces are `agy models`, the Codex cache at `${CODEX_HOME:-~/.codex}/models_cache.json`, Claude floating aliases `opus`/`sonnet`/`haiku`, and Kimi's catalog via `kimi provider list --json`.
-Never infer a model from a name; if discovery is unreachable, fail with the concrete missing requirement and do not fall back to a remembered model identifier.
+The [crew-dispatch configuration owner](../../../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson) defines tier profiles, compatibility with model pins, and discovery failure behavior.
 
 For an unfamiliar namespace, establish support and provider identity from that harness's CLI help, model listing, or current documentation.
 An account-reaching listing that omits a model is concrete unsupported evidence; block the candidate and quote it.

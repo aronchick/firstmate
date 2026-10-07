@@ -803,7 +803,7 @@ When it is absent or contains `default`, crewmates mirror the firstmate's own ha
 `config/secondmate-harness` is a separate local, gitignored file containing the adapter the primary uses to launch secondmate agents, optionally followed by model and effort tokens on the same line.
 The first non-empty, non-comment line is parsed as `<harness> [<model>] [<effort>]`.
 
-A bare `<harness>` preserves the previous behavior: harness only, with no model or effort launch flag.
+A bare `<harness>` supplies no model or effort pin.
 When the harness token is absent or `default`, secondmate launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
 
 `fm-harness.sh secondmate-model` and `fm-harness.sh secondmate-effort` expose only the optional tokens from `config/secondmate-harness`; `config/crew-harness` remains a bare adapter-name file.
@@ -812,7 +812,8 @@ Changing this pin affects the next secondmate spawn or control-plane relaunch; t
 ### Per-launch overrides and inherited defaults
 
 An explicit harness argument to `fm-spawn.sh` still overrides either config file for that spawn only.
-An explicit `--model` or `--effort` overrides the matching token from `config/secondmate-harness`; for a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless those flags are also passed.
+An explicit `--model` or `--effort` overrides the matching token from `config/secondmate-harness`; an explicit `--tier` skips that file's model token unless `--model` is also passed.
+For a local route, an explicit harness or raw launch command starts with clean model and effort defaults unless the caller supplies those axes; [relaunch profile rules](agent-control.md#transactional-relaunch) own retained tiers during recovery.
 
 Remote secondmate routes accept verified harness adapters only and reject raw launch commands.
 When `config/crew-dispatch.json` exists, crewmate and scout spawns require an explicit resolved harness instead of automatically falling back to `config/crew-harness`.
@@ -1088,7 +1089,7 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4 and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`.
+Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4 and `quota-array-dispatch`, then passes the selected harness, tier or model, and effort to `fm-spawn.sh`.
 
 **Spawn requirements**
 
@@ -1129,7 +1130,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | Rule `when` and `use` | Required for each rule. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
-| Profile `tier`, `model`, and `effort`; rule `why` | Recommended profile form: name `tier` (`strong`, `standard`, `fast`) and optional `effort`. Concrete `model` remains accepted for legacy profiles and explicit per-task captain overrides. |
+| Profile `tier`, `model`, and `effort`; rule `why` | Optional; prefer `tier` (`strong`, `standard`, `fast`) and optional `effort` for supported harnesses, while concrete `model` profiles remain compatible and an explicit launch model overrides the tier. |
 
 **Fields applied only by typed resolution**
 
@@ -1172,13 +1173,16 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/fm-harness.sh validate-native-effort` and `bin/fm-spawn.sh` respectively.
 - Codex `max` reasoning effort is derived from the installed model catalog at `${CODEX_HOME:-~/.codex}/models_cache.json`, which advertises supported reasoning levels per model.
-- At spawn time, `bin/fm-spawn.sh` and `bin/fm-dispatch-resolve.sh` resolve a profile's `tier` to the newest concrete model ID from that harness's live discovery surface (`agy models`, `${CODEX_HOME:-~/.codex}/models_cache.json`, Claude floating aliases `opus`/`sonnet`/`haiku`, and Kimi's catalog via `kimi provider list --json`).
+- Tier resolution supports Claude, Codex, agy, and Kimi; [`bin/fm-model-tier.sh`](../bin/fm-model-tier.sh) owns the discovery surfaces and candidate-selection rules.
+- Typed dispatch resolves only the selected rule's tier candidates (or the applicable default), checks resolved Codex effort support before quota ranking, and retains the tier in its emitted launch profile.
+- Spawn resolves the tier again using discovery on the launch host and records both the tier and resolved model; relaunch inheritance and pre-stop validation are owned by [Transactional relaunch](agent-control.md#transactional-relaunch).
 - If discovery is unreachable, spawn and resolution fail with the concrete missing requirement rather than falling back to a remembered model ID.
-- An omitted model, tier, or effort means the selected harness uses its own default for that axis.
+- When both model and tier are omitted, the selected harness uses its own model default; omitted effort uses its effort default.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
 - Every profile array is an implicit quota-aware choice resolved through `quota-array-dispatch`.
 - If no dispatch rule fits, firstmate resolves `default` through the same object-or-array path before falling back to `config/crew-harness`.
-- Except for `ultra`, which refuses unsupported profiles under the native-effort contract above, an effort value the chosen harness does not accept is recorded as `effort=` in task meta for traceability but omitted from the launch flags.
+- Tier profiles refuse unsupported resolved Codex effort before launch; `ultra` follows the native-effort refusal contract above.
+- Other unsupported effort values are recorded as `effort=` in task meta for traceability but omitted from the launch flags.
 - Bootstrap reports unsupported harness/model/effort combinations as a `CREW_DISPATCH` diagnostic when they are visible in the file.
 
 See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a starting point to copy into local `config/crew-dispatch.json`; its Pi default declares the `claude` provider required for typed resolution of that Anthropic model.
@@ -1277,7 +1281,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 - Any applicable `exhausted_now` row or known zero bound makes that candidate ineligible, and a known profile-floor shortfall does the same before unrelated quota uncertainty is considered.
 - Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
-- On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
+- On the opted-in path, profiles with identical harness, tier, model, and effort fields inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
 
@@ -1286,7 +1290,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
 | `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, or a genuine tie. |
-| `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
+| `error` | API, network, malformed response metadata, rendering, quota-axi, or tier-resolution failure. |
 
 Every result above exits 0.
 
@@ -1297,7 +1301,7 @@ Every result above exits 0.
 **Firstmate retains the dispatch decision**
 
 The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captain-approval gate, or `fm-spawn.sh` validation; `AGENTS.md` section 4 owns what firstmate does with each outcome.
-By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
+Beyond the tier-resolution checks above, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
 
 Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
 
