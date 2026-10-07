@@ -969,6 +969,11 @@ resolve_relaunch_profile() {
   else
     TARGET_EFFORT=default
   fi
+  if [ -n "$TARGET_TIER" ]; then
+    local tier_effort=$TARGET_EFFORT
+    [ "$tier_effort" != default ] || tier_effort=
+    "$SCRIPT_DIR/fm-model-tier.sh" resolve "$TARGET_HARNESS" "$TARGET_TIER" "$tier_effort" >/dev/null || return 1
+  fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi

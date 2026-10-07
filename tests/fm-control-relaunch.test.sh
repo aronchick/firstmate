@@ -381,6 +381,27 @@ test_relaunch_discovers_the_recorded_tier_again() {
   pass "replacement launches rediscover the recorded tier"
 }
 
+test_relaunch_refuses_unsupported_tier_effort_before_stop() {
+  local dir out rc
+  dir=$(new_case tier-effort-refusal rl-tier-max)
+  add_ship_task "$dir" rl-tier-max codex
+  printf codex > "$dir/fake/command"
+  printf codex > "$dir/fake/becomes"
+  printf 'model=gpt-5-astra\ntier=strong\neffort=max\n' >> "$dir/home/state/rl-tier-max.meta"
+  cp "$dir/home/state/rl-tier-max.meta" "$dir/meta.before"
+  cp "$dir/home/data/rl-tier-max/brief.md" "$dir/brief.before"
+  mkdir -p "$dir/user-home/.codex"
+  printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$dir/user-home/.codex/models_cache.json"
+  out=$(CODEX_HOME="$dir/user-home/.codex" run_control "$dir" rl-tier-max relaunch --note "continue task"); rc=$?
+  expect_code 1 "$rc" "unsupported replacement effort must refuse: $out"
+  assert_contains "$out" "does not support effort 'max'" "refusal must identify unsupported effort"
+  [ "$(cat "$dir/fake/command")" = codex ] || fail "refused replacement stopped the running worker"
+  assert_no_grep '/exit' "$dir/fake/literal" "refused replacement sent an exit command"
+  cmp -s "$dir/meta.before" "$dir/home/state/rl-tier-max.meta" || fail "refusal changed the task record"
+  cmp -s "$dir/brief.before" "$dir/home/data/rl-tier-max/brief.md" || fail "refusal changed task instructions"
+  pass "tier effort validation refuses relaunch before stopping the worker"
+}
+
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   local dir out rc gen_before gen_after
   dir=$(new_case same rl1)
@@ -2551,6 +2572,7 @@ SH
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
 test_relaunch_discovers_the_recorded_tier_again
+test_relaunch_refuses_unsupported_tier_effort_before_stop
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
