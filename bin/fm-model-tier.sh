@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-model-tier.sh - resolve model tiers from live harness discovery surfaces.
+# fm-model-tier.sh - resolve model tiers from harness discovery surfaces.
 #
 # Usage:
 #   fm-model-tier.sh resolve <harness> <tier> [<effort>]
@@ -11,11 +11,16 @@
 #   standard - everyday / workhorse coding model
 #   fast     - quick, lightweight, or low-latency model
 #
-# Live discovery surfaces:
+# Discovery surfaces:
 #   claude - floating aliases: opus (strong), sonnet (standard), haiku (fast)
-#   codex  - ${CODEX_HOME:-~/.codex}/models_cache.json
+#   codex  - ${CODEX_HOME:-~/.codex}/models_cache.json (Codex-maintained cache;
+#            read on each resolution, without a forced refresh)
 #   agy    - agy models
 #   kimi   - kimi provider list --json
+#
+# Codex, agy, and Kimi candidates are ordered by numeric generation parsed from
+# their IDs, not catalog order or context size. Claude uses floating aliases.
+# Codex excludes hidden models. No matching candidate is an error.
 #
 # Selects only candidates from the discovery surface. If discovery is unreachable,
 # fails with the concrete missing requirement rather than a remembered model id.

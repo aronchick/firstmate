@@ -1173,7 +1173,7 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/fm-harness.sh validate-native-effort` and `bin/fm-spawn.sh` respectively.
 - Codex `max` reasoning effort is derived from the installed model catalog at `${CODEX_HOME:-~/.codex}/models_cache.json`, which advertises supported reasoning levels per model.
-- Tier resolution supports Claude, Codex, agy, and Kimi; [`bin/fm-model-tier.sh`](../bin/fm-model-tier.sh) owns the discovery surfaces and candidate-selection rules.
+- Tier resolution supports Claude, Codex, agy, and Kimi; [`bin/fm-model-tier.sh`](../bin/fm-model-tier.sh) owns the discovery surfaces, generation ordering, and candidate-selection rules, including Codex's cached-catalog limitation.
 - Typed dispatch resolves only the selected rule's tier candidates (or the applicable default), checks resolved Codex effort support before quota ranking, and retains the tier in its emitted launch profile.
 - Spawn resolves the tier again using discovery on the launch host and records both the tier and resolved model; relaunch inheritance and pre-stop validation are owned by [Transactional relaunch](agent-control.md#transactional-relaunch).
 - If discovery is unreachable, spawn and resolution fail with the concrete missing requirement rather than falling back to a remembered model ID.
@@ -1185,7 +1185,7 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 - Other unsupported effort values are recorded as `effort=` in task meta for traceability but omitted from the launch flags.
 - Bootstrap reports unsupported harness/model/effort combinations as a `CREW_DISPATCH` diagnostic when they are visible in the file.
 
-See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a starting point to copy into local `config/crew-dispatch.json`; its Pi default declares the `claude` provider required for typed resolution of that Anthropic model.
+See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for tier-based Claude and Codex profiles and a legacy Pi model profile; Pi does not support tier resolution, and that profile declares the `claude` provider required for typed resolution of its Anthropic model.
 
 **Validation and diagnostics**
 
