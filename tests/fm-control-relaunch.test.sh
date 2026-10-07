@@ -364,6 +364,23 @@ SH
 
 # --- 1. same-harness relaunch -----------------------------------------------
 
+test_relaunch_discovers_the_recorded_tier_again() {
+  local dir out rc
+  dir=$(new_case tier-relauch rl-tier)
+  add_ship_task "$dir" rl-tier codex
+  printf codex > "$dir/fake/command"
+  printf codex > "$dir/fake/becomes"
+  printf 'model=gpt-5-astra\ntier=strong\neffort=high\n' >> "$dir/home/state/rl-tier.meta"
+  mkdir -p "$dir/user-home/.codex"
+  printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier"}]}' > "$dir/user-home/.codex/models_cache.json"
+  out=$(CODEX_HOME="$dir/user-home/.codex" run_control "$dir" rl-tier relaunch --note "continue task"); rc=$?
+  expect_code 0 "$rc" "tier replacement should succeed: $out"
+  assert_grep 'tier=strong' "$dir/home/state/rl-tier.meta" "replacement lost tier"
+  assert_grep 'model=gpt-9-astra' "$dir/home/state/rl-tier.meta" "replacement reused the old model"
+  assert_grep "codex --model 'gpt-9-astra'" "$dir/fake/literal" "replacement did not launch discovered model"
+  pass "replacement launches rediscover the recorded tier"
+}
+
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   local dir out rc gen_before gen_after
   dir=$(new_case same rl1)
@@ -2488,6 +2505,7 @@ SH
 
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
+test_relaunch_discovers_the_recorded_tier_again
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

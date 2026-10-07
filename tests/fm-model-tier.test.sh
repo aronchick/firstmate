@@ -202,6 +202,7 @@ if [ "${1:-}" = "models" ]; then
 gemini-3.9-pro-high
 gemini-3.9-pro-medium
 gemini-3.9-flash-high
+gemini-3.9-flash-low
 gemini-3.9-flash-lite-high
 EOF
   exit 0
@@ -216,6 +217,9 @@ SH
 
   standard=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy standard high)
   assert_equals "gemini-3.9-flash-high" "$standard" "agy standard resolves to gemini-3.9-flash-high"
+
+  standard=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy standard low)
+  assert_equals "gemini-3.9-flash-low" "$standard" "standard preserves requested low effort"
 
   fast=$(PATH="$fakebin:$PATH" "$MODEL_TIER" resolve agy fast high)
   assert_equals "gemini-3.9-flash-lite-high" "$fast" "agy fast resolves to gemini-3.9-flash-lite-high"
@@ -402,6 +406,32 @@ JSON
   pass "effort support is derived from catalog"
 }
 
+test_tier_refuses_unsupported_resolved_effort() {
+  local rec out rc
+  rec=$(make_spawn_case unsupported-tier codex tier-effort)
+  read_case_record "$rec"
+  printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$HOME_DIR/codex-home/models_cache.json"
+  rc=0
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" tier-effort "$PROJ_DIR" --harness codex --tier strong --effort max) || rc=$?
+  expect_code 1 "$rc" "unsupported resolved effort must refuse: $out"
+  [ ! -s "$LAUNCH_LOG" ] || fail "unsupported tier effort reached launch"
+  assert_absent "$HOME_DIR/state/tier-effort.meta" "unsupported tier effort published metadata"
+  pass "tier effort validation follows discovery"
+}
+
+test_hidden_models_are_not_tier_candidates() {
+  local home="$TMP_ROOT/hidden-models" tier out rc
+  mkdir -p "$home"
+  printf '%s\n' '{"models":[{"slug":"gpt-6-astra","visibility":"hide"},{"slug":"gpt-6-sol","visibility":"hide"},{"slug":"gpt-6-luna","visibility":"hide"}]}' > "$home/models_cache.json"
+  for tier in strong standard fast; do
+    rc=0
+    out=$(CODEX_HOME="$home" "$MODEL_TIER" resolve codex "$tier" 2>&1) || rc=$?
+    expect_code 1 "$rc" "hidden $tier model must be refused"
+    assert_contains "$out" "no candidate for tier '$tier'" "missing candidate diagnostic"
+  done
+  pass "hidden models cannot satisfy any tier"
+}
+
 test_tier_resolves_to_newest_model_codex
 test_new_top_model_picked_up_with_no_config_edit
 test_tier_resolves_claude_floating_aliases
@@ -412,5 +442,7 @@ test_legacy_model_profile_still_launches
 test_tier_profile_launches_resolved_model
 test_resolver_warns_on_hardcoded_model_id
 test_catalog_derived_effort_support
+test_hidden_models_are_not_tier_candidates
+test_tier_refuses_unsupported_resolved_effort
 
 echo "# all fm-model-tier tests passed"

@@ -1070,12 +1070,12 @@ crew_dispatch_validate() {
   err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --argjson codex_max_models "$codex_max_models" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);
     def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
-    def effort_ok($h; $m; $e):
+    def effort_ok($h; $m; $e; $t):
       if $e == null then true
       elif ($e | type) != "string" then false
       elif $e == "ultra" then (($h == "pi" or $h == "pi-signed") and (($m | type) == "string") and ($m | startswith("codex-native/")) and ($m | length) > 13)
       elif $h == "claude" then (["low","medium","high","xhigh","max"] | index($e))
-      elif $h == "codex" then ((["low","medium","high","xhigh"] | index($e)) != null or ($e == "max" and ($m != null and ($codex_max_models | index($m)) != null)))
+      elif $h == "codex" then ((["low","medium","high","xhigh"] | index($e)) != null or ($e == "max" and (if $t != null then true else $m != null and ($codex_max_models | index($m)) != null end)))
       elif $h == "grok" then (["low","medium","high"] | index($e))
       elif $h == "agy" then (["low","medium","high"] | index($e))
       elif $h == "pi" or $h == "pi-signed" or $h == "omp" then (["low","medium","high","xhigh","max"] | index($e))
@@ -1111,10 +1111,10 @@ crew_dispatch_validate() {
       ($items | any(has("floor") and floor_bad(.floor; false)));
     def bad_efforts:
       configured_profiles
-      | map({h: .harness, m: .model, e: .effort})
+      | map({h: .harness, m: .model, e: .effort, t: .tier})
       | map(select(.e != null))
       | map(select((.h | type) == "string" and verified(.h)))
-      | map(select(. as $p | effort_ok($p.h; $p.m; $p.e) | not))
+      | map(select(. as $p | effort_ok($p.h; $p.m; $p.e; $p.t) | not))
       | map("\(.h):\(.e)")
       | unique;
     if type != "object" then "top-level value must be an object"

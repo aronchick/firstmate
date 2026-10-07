@@ -67,21 +67,18 @@ fm_model_tier_resolve_codex() {
   strong)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("astra|strong|frontier"; "i")) or ((.description // "") | test("frontier"; "i"))))]
-        | if length == 0 then [.models[]? | select((.slug | test("astra|strong|frontier"; "i")) or ((.description // "") | test("frontier"; "i")))] else . end
         | min_by(.priority // 999) | .slug) // empty
     ' "$cache" 2>/dev/null || true)
     ;;
   standard)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("sol|standard|workhorse"; "i")) or ((.description // "") | test("workhorse"; "i"))))]
-        | if length == 0 then [.models[]? | select((.slug | test("sol|standard|workhorse"; "i")) or ((.description // "") | test("workhorse"; "i")))] else . end
         | min_by(.priority // 999) | .slug) // empty
     ' "$cache" 2>/dev/null || true)
     ;;
   fast)
     resolved=$(jq -r '
       ([.models[]? | select(.visibility != "hide" and ((.slug | test("luna|fast|mini"; "i")) or ((.description // "") | test("fast"; "i"))))]
-        | if length == 0 then [.models[]? | select((.slug | test("luna|fast|mini"; "i")) or ((.description // "") | test("fast"; "i")))] else . end
         | min_by(.priority // 999) | .slug) // empty
     ' "$cache" 2>/dev/null || true)
     ;;
@@ -124,10 +121,10 @@ fm_model_tier_resolve_agy() {
     ;;
   standard)
     if [ -n "$effort" ]; then
-      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${effort}$" | grep -Eiv -- "-(lite|low)" | head -n 1 || true)
+      resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${effort}$" | head -n 1 || true)
     fi
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${target_effort}$" | grep -Eiv -- "-(lite|low)" | head -n 1 || true)
-    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)" | grep -Eiv -- "-(lite|low)" | head -n 1 || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)-${target_effort}$" | head -n 1 || true)
+    [ -n "$resolved" ] || resolved=$(printf '%s\n' "$models" | grep -Ei -- "-(flash|sonnet|standard)" | grep -Eiv -- "-(flash|sonnet|standard)-(lite|low)-" | head -n 1 || true)
     ;;
   fast)
     if [ -n "$effort" ]; then

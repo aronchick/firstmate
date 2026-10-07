@@ -4,7 +4,7 @@
 #
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
-#        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
+#        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>] [--tier <tier>]
 #                                         [--effort <level>]
 #                                         (--note <text> | --note-file <path>)
 #
@@ -242,6 +242,8 @@ fi
 
 NEW_HARNESS=
 NEW_MODEL=
+NEW_TIER=
+TIER_SET=0
 NEW_EFFORT=
 HARNESS_SET=0
 MODEL_SET=0
@@ -256,6 +258,7 @@ for control_arg in "$@"; do
     esac
     case "$control_want_value" in
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
+      tier) NEW_TIER=$control_arg; TIER_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
@@ -271,6 +274,8 @@ for control_arg in "$@"; do
   case "$control_arg" in
     --harness) control_want_value=harness ;;
     --harness=*) NEW_HARNESS=${control_arg#--harness=}; HARNESS_SET=1 ;;
+    --tier) control_want_value=tier ;;
+    --tier=*) NEW_TIER=${control_arg#--tier=}; TIER_SET=1 ;;
     --model) control_want_value=model ;;
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
@@ -292,10 +297,11 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
-    || die "--harness, --model, --effort, and --note apply to 'relaunch' only"
+  [ "$TIER_SET" = 0 ] && [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
+    || die "--harness, --model, --tier, --effort, and --note apply to 'relaunch' only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
+[ "$TIER_SET" = 0 ] || [ -n "$NEW_TIER" ] || die "--tier requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
 case "$NEW_EFFORT" in
@@ -942,6 +948,17 @@ resolve_relaunch_profile() {
   else
     TARGET_MODEL=default
   fi
+  TARGET_TIER=
+  if [ "$TIER_SET" = 1 ]; then
+    TARGET_TIER=$NEW_TIER
+  elif [ "$MODEL_SET" = 0 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
+    TARGET_TIER=$(fm_meta_get "$META" tier)
+  fi
+  case "$TARGET_TIER" in
+    ''|strong|standard|fast) ;;
+    *) die "invalid tier '$TARGET_TIER'; must be strong, standard, or fast" ;;
+  esac
+  [ -z "$TARGET_TIER" ] || TARGET_MODEL=default
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
@@ -1115,7 +1132,11 @@ do_relaunch() {
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
-  [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
+  if [ -n "$TARGET_TIER" ]; then
+    spawn_args+=(--tier "$TARGET_TIER")
+  else
+    spawn_args+=(--model "$TARGET_MODEL")
+  fi
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
       "$SCRIPT_DIR/fm-spawn.sh" "${spawn_args[@]}" >/dev/null; then

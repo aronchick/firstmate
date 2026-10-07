@@ -211,40 +211,6 @@ hardcoded_models=$(jq -r '
   | join(", ")
 ' "$RULES" 2>/dev/null || true)
 
-tier_profiles=$(jq -r '
-  def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
-  ([(.rules // [])[] | profiles(.use)[]] + profiles(.default // null))
-  | map(select(has("tier") and .tier != null and (.model == null or .model == "")))
-  | map([.harness, .tier, (.effort // "")] | @tsv)
-  | unique[]
-' "$RULES" 2>/dev/null || true)
-
-if [ -n "$tier_profiles" ]; then
-  while IFS=$'\t' read -r tharness ttier teffort; do
-    [ -n "$tharness" ] || continue
-    resolved_model=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$tharness" "$ttier" "$teffort") || die "tier resolution failed for $tharness $ttier: could not resolve model"
-    RULES_TMP=$(mktemp) || die "mktemp failed"
-    if jq --arg h "$tharness" --arg t "$ttier" --arg e "$teffort" --arg m "$resolved_model" '
-      def update_profile($p):
-        if $p.harness == $h and $p.tier == $t and (($p.effort // "") == $e) and ($p.model == null or $p.model == "")
-        then $p + {model: $m}
-        else $p end;
-      def update_list($v):
-        if ($v | type) == "array" then map(update_profile(.))
-        elif ($v | type) == "object" then update_profile($v)
-        else $v end;
-      .rules = [(.rules // [])[] | .use = update_list(.use)]
-      | if has("default") then .default = update_list(.default) else . end
-    ' "$RULES" > "$RULES_TMP"; then
-      mv "$RULES_TMP" "$RULES" || die "failed to update rules with resolved tier model"
-    else
-      rm -f "$RULES_TMP"
-      die "failed to update rules with resolved tier model"
-    fi
-  done <<< "$tier_profiles"
-  chmod 400 "$RULES" || die "could not protect rules snapshot"
-fi
-
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   ((.rules // [])[] | profiles(.use)[] | select(has("provider") | not) | "use\t\(.harness)"),
@@ -396,7 +362,9 @@ quota-axi --json > "$QUOTA" 2>/dev/null || emit_error "quota-axi --json failed"
 fm_quota_json_valid < "$QUOTA" || emit_error "quota-axi --json returned an invalid snapshot"
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
-RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
+RESOLVED_MODELS='{}'
+resolve_candidates() {
+RESULT=$(jq -n --argjson resolved_models "$RESOLVED_MODELS" --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -424,7 +392,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   def evidence($rows):
     $rows | map({scope, status, pct: (.effectivePercentRemaining // null), runway: (.runway.status // null), spendPriority: (.selection.spendPriority // null)});
-  def evaluate($c):
+  def evaluate($profile):
+    ($profile + (if $profile.tier then {model: $resolved_models[([$profile.harness, $profile.tier, ($profile.effort // "")] | @json)]} else {} end)) as $c |
     (provider_of($c)) as $p | (lane_of($c)) as $lane |
     if $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
@@ -540,6 +509,19 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end
   end') || emit_error "resolution failed"
 
+}
+resolve_candidates
+tier_profiles=$(jq -r '[.candidates[]?.profile | select(.tier != null)]
+  | map([.harness, .tier, (.effort // "")]) | unique[] | @tsv' <<<"$RESULT")
+if [ -n "$tier_profiles" ]; then
+  while IFS=$'\t' read -r tharness ttier teffort; do
+    resolved_model=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$tharness" "$ttier" "$teffort") || emit_error "tier resolution failed for $tharness $ttier"
+    RESOLVED_MODELS=$(jq -c --arg h "$tharness" --arg t "$ttier" --arg e "$teffort" --arg m "$resolved_model" \
+      '. + {([$h, $t, $e] | @json): $m}' <<<"$RESOLVED_MODELS") || emit_error "tier resolution failed"
+  done <<<"$tier_profiles"
+  resolve_candidates
+fi
+
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");
   def show($value): ($value // "-") | flat;
@@ -559,7 +541,8 @@ TEXT=$(jq -r '
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
       + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
-      + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
+      + (if .chosen.profile.tier then " --tier \(.chosen.profile.tier | shell_arg)"
+         elif .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
 if [ -n "$hardcoded_models" ]; then

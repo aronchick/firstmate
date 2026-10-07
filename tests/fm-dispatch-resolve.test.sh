@@ -1005,4 +1005,25 @@ expect_code 0 "$code" "--help exits 0"
 assert_contains "$out" 'Usage:' "--help prints usage"
 pass "configuration errors exit 2 before any network call"
 
+reset_log
+jq '.rules[0].use = {harness:"agy",tier:"strong",effort:"high"}
+  | .rules[3].use = {harness:"codex",tier:"strong",effort:"max"}
+  | .default = {harness:"agy",tier:"strong",effort:"high"}' "$BASE_RULES" > "$RULES"
+cat > "$FAKEBIN/agy" <<'SH'
+#!/usr/bin/env bash
+printf 'called\n' >> "${FAKE_CURL_LOG}/discovery-agy"
+exit 1
+SH
+chmod +x "$FAKEBIN/agy"
+mkdir -p "$TMP_ROOT/codex-home"
+printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"max"}]}]}' > "$TMP_ROOT/codex-home/models_cache.json"
+write_response "$RESPONSE" rule_4 0.96
+CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "selected tier resolves without unrelated discovery"
+assert_contains "$out" '  status: clear' "tier dispatch must be clear"
+assert_contains "$out" "candidate: codex:gpt-9-astra" "quota evidence uses discovered model"
+assert_contains "$out" "profile: --harness 'codex' --tier 'strong' --effort 'max'" "launch profile retains tier"
+assert_absent "$LOG/discovery-agy" "unselected rules and default must not discover models"
+pass "dispatch resolves only selected candidates and forwards their tiers"
+
 printf '# all fm-dispatch-resolve tests passed\n'

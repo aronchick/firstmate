@@ -48,6 +48,7 @@ cleanup() {
     . "$ROOT/bin/fm-remote-job-lib.sh"
     fm_remote_job_stop_worker_tree "$worker_pid" || true
   fi
+  find "$TMP_ROOT" -type d -name '*.git-hooks' -exec chmod u+w {} +
   rm -rf -- "$TMP_ROOT"
 }
 trap cleanup EXIT
@@ -59,6 +60,14 @@ trap cleanup EXIT
   cd "$ROOT" || exit
   tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .
 ) | (cd "$REMOTE_ROOT" && tar -xf -)
+mkdir -p "$TMP_ROOT/codex-home"
+printf '%s\n' '{"models":[{"slug":"gpt-9-astra","description":"Frontier"}]}' > "$TMP_ROOT/codex-home/models_cache.json"
+mv "$REMOTE_ROOT/bin/fm-model-tier.sh" "$REMOTE_ROOT/bin/fm-model-tier-catalog.sh"
+cat > "$REMOTE_ROOT/bin/fm-model-tier.sh" <<SH
+#!/usr/bin/env bash
+CODEX_HOME='$TMP_ROOT/codex-home' exec '$REMOTE_ROOT/bin/fm-model-tier-catalog.sh' "\$@"
+SH
+chmod +x "$REMOTE_ROOT/bin/fm-model-tier.sh"
 cat > "$REMOTE_ROOT/bin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
@@ -843,7 +852,11 @@ launches_after_inherit=0
 [ "$launches_before_inherit" -eq "$launches_after_inherit" ] \
   || fail "remote spawn reached launch after ambiguous partial inheritance"
 assert_absent "$PARENT/state/ios.meta" "failed remote inheritance published launch metadata"
-out=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate)
+out=$(CODEX_HOME="$TMP_ROOT/missing-parent-catalog" remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --tier strong)
+assert_grep 'tier=strong' "$PARENT/state/ios.meta" "remote route lost the requested tier"
+assert_grep 'model=gpt-9-astra' "$PARENT/state/ios.meta" "parent did not record the remote discovery result"
+assert_grep 'tier=strong' "$REMOTE_HOME/state/parent-route/ios.meta" "host launch lost the tier"
+assert_grep 'model=gpt-9-astra' "$REMOTE_HOME/state/parent-route/ios.meta" "host did not resolve its own catalog"
 assert_contains "$out" 'remote=remote-mac backend=herdr' "remote spawn did not report separate host and backend dimensions"
 assert_grep 'remote_host=remote-mac' "$PARENT/state/ios.meta" "parent metadata omitted the remote host"
 assert_grep 'remote_backend=herdr' "$PARENT/state/ios.meta" "parent metadata omitted the remote-local backend"

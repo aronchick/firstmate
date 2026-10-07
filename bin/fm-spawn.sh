@@ -979,7 +979,7 @@ fi
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
   local remote_backend remote_target remote_harness remote_herdr_session registry_lock remote_lock remote_generation
-  local remote_traceparent remote_recorded_traceparent sm_primary_head sync_out sync_rc
+  local remote_traceparent remote_recorded_traceparent remote_tier sm_primary_head sync_out sync_rc
   local -a launch_args
   id=${POS[0]:-}
   fm_task_id_creation_valid "$id" || {
@@ -1033,10 +1033,14 @@ spawn_remote_secondmate() {
     return 1
     ;;
   esac
+  if [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] && [ "$harness" = "$(fm_meta_get "$STATE/$id.meta" harness)" ]; then
+    TIER=$(fm_meta_get "$STATE/$id.meta" tier)
+  fi
   model=${MODEL:--}
+  [ -z "$TIER" ] || model=-
   effort=${EFFORT:--}
   if [ -z "$HARNESS_ARG" ] && [ -z "$positional" ]; then
-    if [ "$MODEL_SET" -eq 0 ]; then
+    if [ "$MODEL_SET" -eq 0 ] && [ -z "$TIER" ]; then
       model=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
       [ -n "$model" ] || model=-
     fi
@@ -1162,7 +1166,11 @@ spawn_remote_secondmate() {
     remote_traceparent=$(FM_TRACE_CONTEXT=on fm_trace_context_resolve "$CONFIG" "$meta" || true)
   fi
   launch_args=("$id" "$harness" "$model" "$effort" "$backend")
-  [ -z "$remote_traceparent" ] || launch_args+=("$remote_traceparent")
+  if [ -n "$TIER" ]; then
+    launch_args+=("$remote_traceparent" "$TIER")
+  elif [ -n "$remote_traceparent" ]; then
+    launch_args+=("$remote_traceparent")
+  fi
   if out=$("$SCRIPT_DIR/fm-on.sh" "$id" fm-remote-secondmate-control.sh launch \
     "${launch_args[@]}" </dev/null 2>&1); then
     rc=0
@@ -1223,7 +1231,9 @@ spawn_remote_secondmate() {
     echo "mode=secondmate"
     echo "yolo=off"
     echo "tasktmp="
-    echo "model=${model#-}"
+    echo "model=$(printf '%s\n' "$out" | sed -n 's/^model=//p' | tail -1)"
+    remote_tier=$(printf '%s\n' "$out" | sed -n 's/^tier=//p' | tail -1)
+    [ -z "$remote_tier" ] || echo "tier=$remote_tier"
     echo "effort=${effort#-}"
     echo "home=$home"
     echo "projects=$(secondmate_registry_field "$DATA/secondmates.md" "$id" projects)"
@@ -2408,12 +2418,9 @@ if [ "$KIND" != secondmate ]; then
   EXCLUDE_TOOLS=$(fm_exclude_tools_check "$HARNESS" "$RAW_LAUNCH" "$CONFIG") || exit 1
 fi
 
-if [ -n "$TIER" ]; then
-  if [ -z "$MODEL" ]; then
-    MODEL=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$HARNESS" "$TIER" "${EFFORT:-}") || exit 1
-    MODEL_SET=1
-  fi
->>>>>>> c73cbb76 (feat(dispatch): resolve model tiers dynamically at spawn time)
+
+if { [ "$RELAUNCH" -eq 1 ] || [ "$KIND" = secondmate ]; } && [ "$TIER_SET" -eq 0 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = "$(fm_meta_get "$STATE/$ID.meta" harness)" ]; then
+  TIER=$(fm_meta_get "$STATE/$ID.meta" tier)
 fi
 
 case "$HARNESS" in
@@ -2489,7 +2496,7 @@ esac
 # here on every spawn makes the pin durable across respawns. Precedence: explicit
 # --model/--effort flags still win over the file's tokens.
 if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
-  if [ "$MODEL_SET" -eq 0 ]; then
+  if [ "$MODEL_SET" -eq 0 ] && [ -z "$TIER" ]; then
     SM_MODEL=$("$SCRIPT_DIR/fm-harness.sh" secondmate-model)
     [ -z "$SM_MODEL" ] || MODEL=$SM_MODEL
   fi
@@ -2503,6 +2510,14 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
+if [ -n "$TIER" ]; then
+  MODEL=$("$SCRIPT_DIR/fm-model-tier.sh" resolve "$HARNESS" "$TIER" "${EFFORT:-}") || exit 1
+  MODEL_SET=1
+  if [ "$HARNESS" = codex ] && [ "$EFFORT" = max ]; then
+    "$SCRIPT_DIR/fm-model-tier.sh" supports-effort codex "$MODEL" max || exit 1
+  fi
+fi
+
 # Ultra is an explicit native capability, never a Pi thinking-level alias.
 # Validate the fully resolved profile before worktree or endpoint provisioning.
 if [ "$EFFORT" = ultra ]; then
