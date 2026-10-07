@@ -305,7 +305,7 @@ SH
 
 test_legacy_model_profile_still_launches() {
   local rec id out status launch
-  id=tier-legacy-z1
+  id='tier-legacy-z1'
   rec=$(make_spawn_case tier-legacy codex "$id")
   read_case_record "$rec"
 
@@ -323,7 +323,7 @@ test_legacy_model_profile_still_launches() {
 
 test_tier_profile_launches_resolved_model() {
   local rec id out status launch
-  id=tier-spawn-z2
+  id='tier-spawn-z2'
   rec=$(make_spawn_case tier-spawn codex "$id")
   read_case_record "$rec"
 
