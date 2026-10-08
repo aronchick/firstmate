@@ -1,0 +1,15 @@
+ok - tier resolves to newest id in codex catalog
+ok - codex generations outrank catalog order
+ok - new top model is picked up with no config edit
+ok - claude resolves to floating aliases opus/sonnet/haiku
+ok - agy tier resolves from live models listing
+ok - kimi tier resolves from live provider catalog
+ok - kimi tiers prefer newer generations over context size
+ok - unreachable discovery refuses with concrete diagnostic
+ok - legacy model profile still launches
+ok - tier profile resolves model and launches
+ok - effort support is derived from catalog
+ok - legacy max eligibility and launch capability agree
+ok - hidden models cannot satisfy any tier
+ok - tier effort validation follows discovery
+# all fm-model-tier tests passed
