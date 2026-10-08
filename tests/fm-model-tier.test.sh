@@ -6,8 +6,6 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 MODEL_TIER="$ROOT/bin/fm-model-tier.sh"
-SPAWN="$ROOT/bin/fm-spawn.sh"
-RESOLVE="$ROOT/bin/fm-dispatch-resolve.sh"
 TMP_ROOT=$(fm_test_tmproot fm-model-tier)
 
 make_spawn_fakebin() {
@@ -59,7 +57,7 @@ JSON
 }
 
 read_case_record() {
-  IFS='|' read -r CASE_DIR HOME_DIR PROJ_DIR WT_DIR FAKEBIN_DIR LAUNCH_LOG <<EOF
+  IFS='|' read -r _case_dir HOME_DIR PROJ_DIR WT_DIR FAKEBIN_DIR LAUNCH_LOG <<EOF
 $1
 EOF
 }

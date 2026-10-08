@@ -1058,7 +1058,7 @@ crew_dispatch_validate() {
     echo "CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON"
     return 0
   fi
-  codex_max_models=$("$SCRIPT_DIR/fm-model-tier.sh" max-models codex 2>/dev/null || echo '[]')
+  codex_max_models=$("$SCRIPT_DIR/fm-model-tier.sh" max-models codex 2>/dev/null || echo '["gpt-5.6-luna"]')
   typed_key=$TYPESAFE_API_KEY_PRIVATE
   [ -n "$typed_key" ] || typed_key=$(fmx_env_get TYPESAFE_API_KEY "$FM_HOME/.env")
   [ -z "$typed_key" ] || typed_active=true

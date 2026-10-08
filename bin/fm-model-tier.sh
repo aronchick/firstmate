@@ -199,16 +199,16 @@ fm_model_tier_resolve() {
   local harness=$1 tier=$2 effort=${3:-}
   local canonical resolved
   canonical=$(fm_model_tier_canonical "$tier") || return 1
-  resolved=$(case "$harness" in
-  claude) fm_model_tier_resolve_claude "$canonical" "$effort" ;;
-  codex) fm_model_tier_resolve_codex "$canonical" "$effort" ;;
-  agy) fm_model_tier_resolve_agy "$canonical" "$effort" ;;
-  kimi) fm_model_tier_resolve_kimi "$canonical" "$effort" ;;
+  case "$harness" in
+  claude) resolved=$(fm_model_tier_resolve_claude "$canonical" "$effort") || return 1 ;;
+  codex) resolved=$(fm_model_tier_resolve_codex "$canonical" "$effort") || return 1 ;;
+  agy) resolved=$(fm_model_tier_resolve_agy "$canonical" "$effort") || return 1 ;;
+  kimi) resolved=$(fm_model_tier_resolve_kimi "$canonical" "$effort") || return 1 ;;
   *)
     echo "error: harness '$harness' does not support tier resolution" >&2
     return 1
     ;;
-  esac) || return 1
+  esac
   if [ -n "$effort" ] && ! fm_model_catalog_supports_effort "$harness" "$resolved" "$effort"; then
     echo "error: $harness model '$resolved' does not support effort '$effort'" >&2
     return 1
@@ -222,7 +222,14 @@ fm_model_catalog_supports_effort() {
   codex)
     local cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
     if [ ! -f "$cache" ] || [ ! -r "$cache" ]; then
-      return 1
+      if [ "$effort" = "max" ]; then
+        [ "$model" = "gpt-5.6-luna" ]
+        return $?
+      fi
+      case "$effort" in
+      low | medium | high | xhigh) return 0 ;;
+      *) return 1 ;;
+      esac
     fi
     local count
     count=$(jq -r --arg m "$model" --arg e "$effort" '
@@ -239,9 +246,9 @@ fm_model_catalog_supports_effort() {
 fm_codex_max_models() {
   local cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
   if [ -f "$cache" ] && [ -r "$cache" ]; then
-    jq -c '[.models[]? | select(.supported_reasoning_levels[]?.effort == "max") | .slug] // []' "$cache" 2>/dev/null || echo '[]'
+    jq -c '([.models[]? | select(.supported_reasoning_levels[]?.effort == "max") | .slug] + ["gpt-5.6-luna"]) | unique' "$cache" 2>/dev/null || echo '["gpt-5.6-luna"]'
   else
-    echo '[]'
+    echo '["gpt-5.6-luna"]'
   fi
 }
 

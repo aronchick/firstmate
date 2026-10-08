@@ -416,8 +416,12 @@ cp "$ROOT/docs/examples/crew-dispatch.json" "$RULES"
 cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"default","confidence":0.9,"probabilities":{"rule_1":0.02,"rule_2":0.02,"rule_3":0.02,"default":0.94}}},"usage":{"input_tokens":812,"output_tokens":60}}
 JSON
+mkdir -p "$TMP_ROOT/codex-home"
+cat > "$TMP_ROOT/codex-home/models_cache.json" <<'JSON'
+{"models":[{"slug":"gpt-6-sol","description":"workhorse","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-6-astra","description":"Frontier","supported_reasoning_levels":[{"effort":"high"}]}]}
+JSON
 reset_log
-TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+CODEX_HOME="$TMP_ROOT/codex-home" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "the documented example passes opted-in resolution"
 assert_contains "$out" 'candidate: pi:anthropic/claude-sonnet-5  provider=claude' "the documented Pi default uses its declared Claude provider"
 assert_not_contains "$err" 'malformed rules file' "the documented example reaches resolution"
