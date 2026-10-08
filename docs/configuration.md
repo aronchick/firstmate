@@ -1172,9 +1172,9 @@ This single-provider table is separate from the frozen legacy mapping used by `f
 **Model, effort, and fallback behavior**
 
 - `ultra` is native-only: the model-aware validation contract and launch mapping are owned by `bin/fm-harness.sh validate-native-effort` and `bin/fm-spawn.sh` respectively.
-- Codex `max` reasoning effort is derived from the installed model catalog at `${CODEX_HOME:-~/.codex}/models_cache.json`, which advertises supported reasoning levels per model.
+- Codex `max` reasoning effort requires the selected model's entry in `${CODEX_HOME:-~/.codex}/models_cache.json` to advertise `max`; a missing, unreadable, or malformed catalog, an absent model, or an entry without `max` provides no support, including for legacy model pins.
 - Tier resolution supports Claude, Codex, agy, and Kimi; [`bin/fm-model-tier.sh`](../bin/fm-model-tier.sh) owns the discovery surfaces, generation ordering, and candidate-selection rules, including Codex's cached-catalog limitation.
-- Typed dispatch resolves only the selected rule's tier candidates (or the applicable default), checks resolved Codex effort support before quota ranking, and retains the tier in its emitted launch profile.
+- Typed dispatch resolves only the selected rule's tier candidates (or the applicable default), checks resolved Codex effort support before quota ranking, and retains the tier in its emitted launch profile; a profile with an explicit model pin skips tier discovery, uses that model for quota and effort checks, and emits the model instead of the tier.
 - Spawn resolves the tier again using discovery on the launch host and records both the tier and resolved model; relaunch inheritance and pre-stop validation are owned by [Transactional relaunch](agent-control.md#transactional-relaunch).
 - If discovery is unreachable, spawn and resolution fail with the concrete missing requirement rather than falling back to a remembered model ID.
 - When both model and tier are omitted, the selected harness uses its own model default; omitted effort uses its effort default.
