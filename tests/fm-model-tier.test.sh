@@ -434,6 +434,32 @@ JSON
   pass "effort support is derived from catalog"
 }
 
+test_max_capabilities_agree_for_legacy_model() {
+  local codex_home="$TMP_ROOT/codex-legacy-max" scenario max_models rc expected
+  mkdir -p "$codex_home"
+  for scenario in missing malformed omitted unsupported supported; do
+    expected=1
+    case "$scenario" in
+    missing) rm -f "$codex_home/models_cache.json" ;;
+    malformed) printf '%s\n' '{' > "$codex_home/models_cache.json" ;;
+    omitted) printf '%s\n' '{"models":[]}' > "$codex_home/models_cache.json" ;;
+    unsupported) printf '%s\n' '{"models":[{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"high"}]}]}' > "$codex_home/models_cache.json" ;;
+    supported)
+      printf '%s\n' '{"models":[{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"max"}]}]}' > "$codex_home/models_cache.json"
+      expected=0
+      ;;
+    esac
+    max_models=$(CODEX_HOME="$codex_home" "$MODEL_TIER" max-models codex)
+    rc=0
+    jq -e 'index("gpt-5.6-luna") != null' <<<"$max_models" >/dev/null || rc=$?
+    expect_code "$expected" "$rc" "$scenario catalog dispatch max eligibility"
+    rc=0
+    CODEX_HOME="$codex_home" "$MODEL_TIER" supports-effort codex gpt-5.6-luna max || rc=$?
+    expect_code "$expected" "$rc" "$scenario catalog launch max capability"
+  done
+  pass "legacy max eligibility and launch capability agree"
+}
+
 test_tier_refuses_unsupported_resolved_effort() {
   local rec out rc
   rec=$(make_spawn_case unsupported-tier codex tier-effort)
@@ -471,6 +497,7 @@ test_unreachable_discovery_refuses
 test_legacy_model_profile_still_launches
 test_tier_profile_launches_resolved_model
 test_catalog_derived_effort_support
+test_max_capabilities_agree_for_legacy_model
 test_hidden_models_are_not_tier_candidates
 test_tier_refuses_unsupported_resolved_effort
 

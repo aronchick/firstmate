@@ -222,10 +222,6 @@ fm_model_catalog_supports_effort() {
   codex)
     local cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
     if [ ! -f "$cache" ] || [ ! -r "$cache" ]; then
-      if [ "$effort" = "max" ]; then
-        [ "$model" = "gpt-5.6-luna" ]
-        return $?
-      fi
       case "$effort" in
       low | medium | high | xhigh) return 0 ;;
       *) return 1 ;;
@@ -246,9 +242,9 @@ fm_model_catalog_supports_effort() {
 fm_codex_max_models() {
   local cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
   if [ -f "$cache" ] && [ -r "$cache" ]; then
-    jq -c '([.models[]? | select(.supported_reasoning_levels[]?.effort == "max") | .slug] + ["gpt-5.6-luna"]) | unique' "$cache" 2>/dev/null || echo '["gpt-5.6-luna"]'
+    jq -c '[.models[]? | select(.supported_reasoning_levels[]?.effort == "max") | .slug] | unique' "$cache" 2>/dev/null || echo '[]'
   else
-    echo '["gpt-5.6-luna"]'
+    echo '[]'
   fi
 }
 
