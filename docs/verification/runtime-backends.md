@@ -4,6 +4,20 @@ Audience: maintainer verification.
 
 This record contains reusable version-scoped evidence for active runtime guarantees.
 The backend guides own current setup, safety boundaries, and limitations.
+
+## Idle worker tab closure
+
+Verified 2026-10-10 with Herdr 0.9.1 and Pi 0.64.0.
+Refresh the token-free native check with:
+
+```sh
+bash tests/fm-control-close-tab-live-e2e.test.sh
+```
+
+Output: `ok - real idle Pi with draft closes without submission, records and worktree retained`.
+The isolated Herdr lab runs the real `fm-control.sh worker exit --close-tab`, preserves its unsent draft in a private checkpoint, and proves that the pane and recorded foreground processes are gone.
+Lab teardown passed the default-session tripwire.
+`bash tests/fm-control-close-tab.test.sh` covers refusal for supervisor, busy, shared, unreadable, and replaced-harness targets.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
 ## Harness detection precedence
