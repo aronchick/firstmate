@@ -1,0 +1,4 @@
+native_agent=idle recorded_harness=codex exit_status=1
+control_output=fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4KW0SQP0RK5HV7VPAWY0JJ7/.close-identity-live.ogCsdl/home
+error: idle tab close refused or unconfirmed; checkpoint=/Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4KW0SQP0RK5HV7VPAWY0JJ7/.close-identity-live.ogCsdl/home/state/worker.closed-tab.L4wbjt
+pane=present task_record=present

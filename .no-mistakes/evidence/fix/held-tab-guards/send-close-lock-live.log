@@ -1,0 +1,11 @@
+send_exit_status=1
+send_output=fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4KW0SQP0RK5HV7VPAWY0JJ7/.send-close-live.MtOVwD/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: lifecycle action is already running for this task; steer not sent
+pane=present inbox=absent

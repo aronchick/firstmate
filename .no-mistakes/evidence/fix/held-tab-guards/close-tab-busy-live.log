@@ -1,0 +1,4 @@
+exit_status=1
+control_output=fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4KW0SQP0RK5HV7VPAWY0JJ7/.close-tab-live.7vOcjl/home
+error: idle tab close refused or unconfirmed; checkpoint=/Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4KW0SQP0RK5HV7VPAWY0JJ7/.close-tab-live.7vOcjl/home/state/worker.closed-tab.XxnJ31
+pane=present foreground=sleep task_record=present worktree=present
