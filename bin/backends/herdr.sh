@@ -2501,7 +2501,9 @@ fm_backend_herdr_idle_task_tab_matches() {  # <session> <pane> <tab> <workspace>
       and $ps[0].workspace_id == $ws' >/dev/null || return 1
   state=$(fm_backend_herdr_pane_agent_state "$session" "$pane")
   case "$state" in
-    no-agent|stale-agent) return 0 ;;
+    no-agent|stale-agent)
+      [ "$(fm_backend_herdr_pane_process_state "$session" "$pane")" = shell ]
+      ;;
     live)
       info=$(fm_backend_herdr_cli "$session" agent get "$pane") || return 1
       # Herdr names both Pi launchers pi; control keeps the signed identity.

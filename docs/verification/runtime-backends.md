@@ -15,7 +15,7 @@ bash tests/fm-control-close-tab-live-e2e.test.sh
 ```
 
 Output: `ok - real idle Pi with draft closes without submission, records and worktree retained`.
-The isolated Herdr lab runs the real `fm-control.sh worker exit --close-tab`, preserves its unsent draft in a private checkpoint, and proves that the pane and recorded foreground processes are gone.
+The isolated Herdr lab runs the real `fm-control.sh worker exit --close-tab`, captures a visible single-line unsent draft in a private viewport checkpoint, and proves that the pane and recorded foreground processes are gone. Hidden lines of a multiline editor draft are outside this checkpoint contract.
 Lab teardown passed the default-session tripwire.
 `bash tests/fm-control-close-tab.test.sh` covers refusal for supervisor, busy, shared, unreadable, and replaced-harness targets.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.

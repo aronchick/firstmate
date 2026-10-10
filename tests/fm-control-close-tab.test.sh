@@ -9,7 +9,7 @@ TMP_ROOT=$(fm_test_tmproot fm-close-tab)
 mkdir -p "$TMP_ROOT"
 trap 'kill "${CHILD:-}" 2>/dev/null || true; rm -rf "$TMP_ROOT"' EXIT
 unset HERDR_PANE_ID
-STATE=live STATUS=idle SHARED=0 CLOSED=0 HARNESS=agy
+STATE=live STATUS=idle SHARED=0 CLOSED=0 HARNESS=agy PROCESS_STATE=shell
 sleep 120 &
 CHILD=$!
 fm_backend_herdr_cli() {
@@ -31,6 +31,7 @@ fm_backend_herdr_cli() {
   esac
 }
 fm_backend_herdr_pane_agent_state() { printf '%s' "$STATE"; }
+fm_backend_herdr_pane_process_state() { printf '%s' "$PROCESS_STATE"; }
 fm_backend_herdr_visible_capture() { printf '> unsent draft\n'; }
 fm_backend_herdr_kill() {
   [ "$1" = 'lab:w:p' ] || fail 'wrong endpoint closed'
@@ -58,9 +59,15 @@ STATE=live STATUS=idle
 HARNESS=codex
 reject 'replaced harness'
 HARNESS=agy
+STATE=no-agent PROCESS_STATE=other
+reject 'unregistered busy command'
+PROCESS_STATE=unreadable
+reject 'unregistered unreadable process'
+PROCESS_STATE=shell
+STATE=live
 fm_backend_herdr_close_idle_task lab:w:p w:t w "$TMP_ROOT/screen" agy \
   || fail 'idle close failed'
 [ "$CLOSED" = 1 ] || fail 'idle close missing'
-assert_contains "$(cat "$TMP_ROOT/screen")" 'unsent draft' 'private checkpoint preserves draft'
+assert_contains "$(cat "$TMP_ROOT/screen")" 'unsent draft' 'visible viewport checkpoint contains draft'
 kill -0 "$CHILD" 2>/dev/null && fail 'worker survived close'
-pass 'idle closure preserves draft without composer input and proves process gone'
+pass 'idle closure captures visible draft without submission and proves process gone'

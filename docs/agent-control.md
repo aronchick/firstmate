@@ -53,7 +53,7 @@ Ordinary `exit` reads the composer's state before typing the exit command and re
 `exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it; it sends no Escape and chooses no option, so closing the dialog is left to the operator.
 A stopped agent whose pane still shows the dialog text is not refused.
 To park an idle Herdr worker without retaining its tab, use `fm-control.sh <task-id> exit --close-tab`.
-This explicit option preserves the worktree and task records, saves the viewport privately, and closes only the worker's singleton tab without submitting pending composer text.
+This explicit terminal close preserves the worktree and task records, saves the visible viewport privately, and closes only the worker's singleton tab without submitting pending composer text. The checkpoint does not contain hidden lines of a multiline editor draft.
 It refuses busy, shared, unreadable, and supervisor targets, and confirms both pane removal and foreground process exit; `tests/fm-control-close-tab.test.sh` covers the refusal and preservation contract.
 [`fm_composer_blocking_dialog`](../bin/fm-composer-lib.sh) owns the recognised set, which today is only Claude's background-task exit picker; [its verification record](verification/runtime-backends.md#claude-background-task-exit-picker) lists the dialogs that are not covered.
 
@@ -194,7 +194,6 @@ Per-harness interrupt keys, repeat counts, composer clears, exit commands, and s
 The empirical basis for each adapter's value is the `harness-adapters` skill's verification record for that adapter.
 
 ## Verification
-
 
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
 - `tests/fm-control-relaunch.test.sh` - the relaunch transaction: identity preservation, harness switching, the progress note, checkpoint refusals, rollback after a failed launch, and the endpoint-absence proof both verbs share - the Herdr reclaim of a destroyed endpoint, and tmux refusing one it cannot prove absent.
