@@ -14,11 +14,10 @@ Refresh the token-free native check with:
 bash tests/fm-control-close-tab-live-e2e.test.sh
 ```
 
-Output: `ok - real idle Pi with draft closes without submission, records and worktree retained`.
-The isolated Herdr lab runs the real `fm-control.sh worker exit --close-tab`, captures a visible single-line unsent draft in a private viewport checkpoint, and proves that the pane and recorded foreground processes are gone.
+The isolated Herdr lab runs the real `fm-control.sh <task> exit --close-tab` against a marked lab home. It confirms guard refusals for an unregistered foreground command, an idle Pi registration over that command, a recorded Pi identity facing a live `agy` process, and a shell with an active background command. Each refused pane remains open. The same run closes a real idle Pi pane, captures a visible single-line unsent draft in a private viewport checkpoint, and proves that the pane and recorded foreground processes are gone.
 Hidden lines of a multiline editor draft are outside this checkpoint contract.
 Lab teardown passed the default-session tripwire.
-`bash tests/fm-control-close-tab.test.sh` covers refusal for supervisor, busy, shared, unreadable, mismatched harness, unrelated foreground command, and active background command targets.
+`bash tests/fm-control-close-tab.test.sh` additionally covers supervisor, shared, and unreadable targets through focused adapter regressions. The native refusal cases use Herdr's lifecycle reporting for stale and replacement registrations; they do not exercise a model turn or prove every harness version's exit behavior.
 
 ## Harness detection precedence
 
