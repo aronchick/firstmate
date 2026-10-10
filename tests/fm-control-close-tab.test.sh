@@ -9,7 +9,7 @@ TMP_ROOT=$(fm_test_tmproot fm-close-tab)
 mkdir -p "$TMP_ROOT"
 trap 'kill "${CHILD:-}" 2>/dev/null || true; rm -rf "$TMP_ROOT"' EXIT
 unset HERDR_PANE_ID
-STATE=live STATUS=idle SHARED=0 CLOSED=0 HARNESS=agy PROCESS_STATE=shell
+STATE=live STATUS=idle SHARED=0 CLOSED=0 HARNESS=agy PROCESS_STATE=agent
 sleep 120 &
 CHILD=$!
 fm_backend_herdr_cli() {
@@ -59,11 +59,13 @@ STATE=live STATUS=idle
 HARNESS=codex
 reject 'replaced harness'
 HARNESS=agy
+PROCESS_STATE=other
+reject 'registered idle with unrelated busy command'
 STATE=no-agent PROCESS_STATE=other
 reject 'unregistered busy command'
 PROCESS_STATE=unreadable
 reject 'unregistered unreadable process'
-PROCESS_STATE=shell
+PROCESS_STATE=agent
 STATE=live
 fm_backend_herdr_close_idle_task lab:w:p w:t w "$TMP_ROOT/screen" agy \
   || fail 'idle close failed'
