@@ -2502,10 +2502,11 @@ fm_backend_herdr_idle_task_tab_matches() {  # <session> <pane> <tab> <workspace>
   state=$(fm_backend_herdr_pane_agent_state "$session" "$pane")
   case "$state" in
     no-agent|stale-agent)
-      [ "$(fm_backend_herdr_pane_process_state "$session" "$pane")" = shell ]
+      fm_backend_herdr_pane_idle_shell_pid "$session" "$pane" >/dev/null
       ;;
     live)
       [ "$(fm_backend_herdr_pane_process_state "$session" "$pane")" = agent ] || return 1
+      fm_backend_herdr_idle_task_process_matches "$session" "$pane" "$harness" || return 1
       info=$(fm_backend_herdr_cli "$session" agent get "$pane") || return 1
       # Herdr names both Pi launchers pi; control keeps the signed identity.
       [ "$harness" != pi-signed ] || harness=pi
@@ -2516,6 +2517,39 @@ fm_backend_herdr_idle_task_tab_matches() {  # <session> <pane> <tab> <workspace>
       ;;
     *) return 1 ;;
   esac
+}
+
+fm_backend_herdr_idle_task_process_matches() {  # <session> <pane> <harness>
+  local session=$1 pane=$2 harness=$3 info count i pid name argv0 args verdict found=0
+  [ "$harness" != pi-signed ] || harness=pi
+  info=$(fm_backend_herdr_cli "$session" pane process-info --pane "$pane") || return 1
+  printf '%s' "$info" | jq -e --arg pane "$pane" '
+    .result.type == "pane_process_info"
+    and .result.process_info.pane_id == $pane
+    and (.result.process_info.foreground_processes | type == "array" and length > 0)
+  ' >/dev/null 2>&1 || return 1
+  count=$(printf '%s' "$info" | jq -r '.result.process_info.foreground_processes | length') || return 1
+  i=0
+  while [ "$i" -lt "$count" ]; do
+    pid=$(printf '%s' "$info" | jq -er --argjson i "$i" \
+      '.result.process_info.foreground_processes[$i].pid | select(type == "number" and . > 1) | floor') || return 1
+    name=$(printf '%s' "$info" | jq -r --argjson i "$i" \
+      '.result.process_info.foreground_processes[$i].name // empty') || return 1
+    argv0=$(printf '%s' "$info" | jq -r --argjson i "$i" '
+      .result.process_info.foreground_processes[$i] as $p
+      | (($p.argv // [])[0]) // $p.argv0 // empty') || return 1
+    args=$(printf '%s' "$info" | jq -r --argjson i "$i" '
+      .result.process_info.foreground_processes[$i] as $p
+      | $p.cmdline // (($p.argv // []) | join(" ")) // empty') || return 1
+    [ "$(fm_agent_process_classify "$name" "$argv0" "$args" "$pid")" = agent ] || return 1
+    verdict=$("$FM_BACKEND_HERDR_ROOT/bin/fm-harness.sh" ancestry "$pid") || return 1
+    case "$verdict" in
+      "comm $harness"|"args $harness") found=1 ;;
+      *) return 1 ;;
+    esac
+    i=$((i + 1))
+  done
+  [ "$found" = 1 ]
 }
 
 fm_backend_herdr_agent_alive() {  # <target>
