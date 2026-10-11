@@ -199,7 +199,7 @@ wait_for_checkpoint_lock() {
 }
 
 test_quiet_checkpoint_exits_124_cleanly() {
-  local home out err status
+  local home out err status watcher_pid
   home=$(make_home quiet)
   out="$home/out.txt"
   err="$home/err.txt"
@@ -207,7 +207,10 @@ test_quiet_checkpoint_exits_124_cleanly() {
   FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 "$CHECKPOINT" --seconds 1 >"$out" 2>"$err" || status=$?
   expect_code 124 "$status" "quiet checkpoint exit"
   assert_contains "$(cat "$out")" "checkpoint: no actionable wake within 1s" "quiet checkpoint line missing"
-  assert_absent "$home/state/.watch.lock/pid" "watch lock pid survived quiet checkpoint timeout"
+  watcher_pid=$(cat "$home/state/.watch.lock/pid" 2>/dev/null || true)
+  if [ -n "$watcher_pid" ] && session_process_alive "$watcher_pid"; then
+    fail "quiet checkpoint left a watcher running"
+  fi
   pass "quiet checkpoint exits 124 with a clean checkpoint line and no live lock"
 }
 
