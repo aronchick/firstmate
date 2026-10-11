@@ -1,0 +1,8 @@
+primary_pid=84290
+arm_pid=42191 watcher_pid=42263
+42191 42045 S    bash
+42263 42191 S    bash
+84290 84288 Ss+  node
+primary_after=watcher_after=singleton_after=watcher: started pid=42263 (beacon fresh)
+watcher: FAILED - watcher cycle exited 143 without an actionable reason
+watcher: exiting - session owner exited: pid=84290

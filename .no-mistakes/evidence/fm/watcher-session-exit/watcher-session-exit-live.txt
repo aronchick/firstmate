@@ -1,0 +1,8 @@
+BEFORE ownerA=88102 watcherA=88203 ownerB=88103 watcherB=88202
+88202 S    bash /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4MCH3YXNPGJTFDQMH9GEV3P/bin/fm-watch.sh
+88203 S    bash /Users/daaronch/.no-mistakes/worktrees/d64a0045f4b7/01M4MCH3YXNPGJTFDQMH9GEV3P/bin/fm-watch.sh
+AFTER ownerA=exited watcherA=exited watcherB=alive singletonA=removed
+OWNER EXIT DIAGNOSTIC: watcher: started pid=88203 (beacon fresh)
+watcher: exiting - session owner exited: pid=88102
+watcher: stopped pid=88202
+OTHER HOME STOP: completed on request

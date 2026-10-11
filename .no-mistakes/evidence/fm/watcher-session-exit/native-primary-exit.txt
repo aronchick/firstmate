@@ -1,0 +1,8 @@
+Before primary exit
+session_lock_pid=96219 watcher_lock_pid=22234 arm_pid=22176
+22176 22163 S    bash
+22234 22176 S    bash
+96219 96209 Ss+  claude
+After primary exit
+watcher_lock_pid=22234
+watcher_status=absent
