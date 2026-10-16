@@ -1066,16 +1066,6 @@ test_main_only_pass_through_leaves_the_successor_watcher_running() {
 test_attended_close_with_unidentified_main_session_passes_to_main() {
   local home
   home=$(make_home attended-unidentified attended)
-  # Only the host's session-key lookup loses the owner identity. The watcher
-  # retains its readable process view so it can deliver this host-routing case.
-  cat > "$home/fakebin/bash" <<'SH'
-#!/bin/bash
-case "$1" in
-  */fm-watch.sh) export FM_PROC_ROOT_OVERRIDE="$FM_HOME/watcher-proc" ;;
-esac
-exec /bin/bash "$@"
-SH
-  chmod +x "$home/fakebin/bash"
   FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" \
     "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"

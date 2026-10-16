@@ -8,9 +8,13 @@ set -u
 CHECKPOINT="$ROOT/bin/fm-watch-checkpoint.sh"
 TMP_ROOT=$(fm_test_tmproot fm-watch-checkpoint)
 SESSION_TEST_PIDS=()
+SESSION_TEST_RELEASES=()
 cleanup_session_tests() {
+  local pid release
+  for release in "${SESSION_TEST_RELEASES[@]}"; do
+    [ ! -d "${release%/*}" ] || : > "$release"
+  done
   fm_test_cleanup
-  local pid
   for pid in "${SESSION_TEST_PIDS[@]}"; do
     kill -TERM "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
@@ -47,16 +51,65 @@ start_session_owner() {
   SESSION_TEST_PIDS+=("$SESSION_OWNER_PID")
 }
 
-start_session_watcher() { # <home> [check-interval]
+launch_session_watcher() {
   local home=$1 interval=${2:-999999}
   printf '%s\n' "$SESSION_OWNER_PID" > "$home/state/.lock"
   fm_test_track_watcher_state "$home/state"
   FM_HOME="$home" FM_POLL=30 FM_CHECK_INTERVAL="$interval" FM_HEARTBEAT=999999 \
-    "$ROOT/bin/fm-watch-arm.sh" >"$home/arm.out" 2>"$home/arm.err" &
+    bash -c '
+      printf "%s\n" "$$" > "$FM_HOME/launcher.pid"
+      exec "$0"
+    ' "$ROOT/bin/fm-watch-arm.sh" >"$home/arm.out" 2>"$home/arm.err" &
   SESSION_ARM_PID=$!
   SESSION_TEST_PIDS+=("$SESSION_ARM_PID")
+}
+
+start_session_watcher() { # <home> [check-interval]
+  local home=$1
+  launch_session_watcher "$@"
   wait_session_watcher "$home" live
   SESSION_WATCH_PID=$(cat "$home/state/.watch.lock/pid")
+}
+
+publish_session_owner() {
+  FM_HOME="$1" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$STATE/.lock.acquire"
+    printf "%s\n" "$2" > "$STATE/.lock"
+    fm_lock_release "$STATE/.lock.acquire"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$2" || fail "replacement publication failed"
+}
+
+make_session_startup_barrier() {
+  local home=$1
+  mkdir -p "$home/fakebin"
+  command -v ps > "$home/real-ps"
+  SESSION_TEST_RELEASES+=("$home/identity-release")
+  cat > "$home/fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+launcher=$(cat "$FM_HOME/launcher.pid" 2>/dev/null || true)
+if [ "${1:-}" = -p ] && [ "${2:-}" = "$launcher" ] \
+  && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ] \
+  && [ -f "$FM_HOME/state/.watch.lock/pid-identity" ] \
+  && mkdir "$FM_HOME/identity-gate" 2>/dev/null; then
+  : > "$FM_HOME/identity-requested"
+  while [ ! -e "$FM_HOME/identity-release" ]; do sleep 0.05; done
+fi
+exec "$(cat "$FM_HOME/real-ps")" "$@"
+SH
+  chmod +x "$home/fakebin/ps"
+}
+
+wait_session_startup_barrier() {
+  local home=$1 i=0
+  while [ ! -e "$home/identity-requested" ] && [ "$i" -lt 200 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$home/identity-requested" ] || fail "watcher never requested its launcher's startup identity: $(cat "$home/arm.err")"
+  SESSION_WATCH_PID=$(cat "$home/state/.watch.lock/pid")
+  session_process_alive "$SESSION_WATCH_PID" || fail "watcher exited before startup was released"
+  assert_absent "$home/state/.last-watcher-beat" "watcher reached its poll before startup was released"
 }
 
 # The real arm remains alive after its session owner exits, reproducing a
@@ -97,12 +150,7 @@ test_replacement_owner_preserves_supervision_until_it_exits() {
   replacement=$SESSION_OWNER_PID
   # Publish through the same claim lock used by fm-lock.sh; a late old exit
   # must see the replacement before deciding whether to stop this watcher.
-  FM_HOME="$home" bash -c '
-    . "$1"
-    fm_lock_acquire_wait "$STATE/.lock.acquire"
-    printf "%s\n" "$2" > "$STATE/.lock"
-    fm_lock_release "$STATE/.lock.acquire"
-  ' _ "$ROOT/bin/fm-wake-lib.sh" "$replacement" || fail "replacement publication failed"
+  publish_session_owner "$home" "$replacement"
   kill -TERM "$old_owner"
   wait "$old_owner" || true
   sleep 2
@@ -147,6 +195,95 @@ test_launcher_exit_stops_watcher_with_a_live_shared_owner() {
   session_process_alive "$owner" || fail "launcher exit killed the shared owner process"
   assert_contains "$(cat "$home/arm.err")" 'session launcher exited' "launcher exit was not diagnosed"
   pass "launcher exit stops its watcher even while a shared owner process remains alive"
+}
+
+test_live_owner_with_unreadable_identity_retains_supervision() {
+  local home owner watcher
+  home=$(make_home unreadable-owner)
+  start_session_owner
+  owner=$SESSION_OWNER_PID
+  mkdir -p "$home/proc/$owner"
+  printf '%s (sleep) S\n' "$owner" > "$home/proc/$owner/stat"
+  printf 'sleep\0' > "$home/proc/$owner/cmdline"
+  if FM_PROC_ROOT_OVERRIDE="$home/proc" bash -c '. "$1"; fm_pid_identity "$2"' \
+    _ "$ROOT/bin/fm-wake-lib.sh" "$owner" >/dev/null; then
+    fail "the live owner's identity was readable in the unreadable-identity fixture"
+  fi
+  FM_PROC_ROOT_OVERRIDE="$home/proc" start_session_watcher "$home"
+  watcher=$SESSION_WATCH_PID
+  sleep 2
+  session_process_alive "$owner" || fail "the unreadable owner exited before the assertion"
+  session_process_alive "$watcher" || fail "unreadable identity stopped a live owner's watcher"
+  session_process_alive "$SESSION_ARM_PID" || fail "unreadable identity stopped the live arm"
+  kill -TERM "$owner"
+  wait "$owner" || true
+  SESSION_WATCH_PID=$watcher
+  wait_session_watcher "$home" gone
+  assert_contains "$(cat "$home/arm.err")" 'session owner exited' "unreadable identity disabled owner-exit detection"
+  pass "a live owner with unreadable identity retains supervision until it exits"
+}
+
+test_launcher_exit_before_identity_capture_stops_watcher() {
+  local home owner arm
+  home=$(make_home launcher-startup-exit)
+  make_session_startup_barrier "$home"
+  start_session_owner
+  owner=$SESSION_OWNER_PID
+  PATH="$home/fakebin:$PATH" FM_PROC_ROOT_OVERRIDE="$home/no-proc" launch_session_watcher "$home"
+  arm=$SESSION_ARM_PID
+  wait_session_startup_barrier "$home"
+  kill -KILL "$arm"
+  wait "$arm" 2>/dev/null || true
+  : > "$home/identity-release"
+  wait_session_watcher "$home" gone
+  session_process_alive "$owner" || fail "startup launcher exit killed the shared owner"
+  assert_absent "$home/state/.watch.lock/pid" "startup launcher exit retained the watcher singleton"
+  assert_contains "$(cat "$home/arm.err")" 'session launcher exited' "startup launcher exit was not diagnosed"
+  pass "launcher exit before identity capture stops its watcher with a live shared owner"
+}
+
+test_replacement_before_first_owner_observation_preserves_supervision() {
+  local home owner replacement watcher arm holder i=0
+  home=$(make_home replacement-before-monitor)
+  start_session_owner
+  owner=$SESSION_OWNER_PID
+  start_session_owner
+  replacement=$SESSION_OWNER_PID
+  SESSION_TEST_RELEASES+=("$home/ownership-release")
+  FM_HOME="$home" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$STATE/.lock.acquire"
+    trap '\''fm_lock_release "$STATE/.lock.acquire"'\'' EXIT
+    : > "$FM_HOME/ownership-held"
+    while [ ! -e "$FM_HOME/ownership-release" ]; do sleep 0.05; done
+    printf "%s\n" "$2" > "$STATE/.lock"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$replacement" &
+  holder=$!
+  SESSION_TEST_PIDS+=("$holder")
+  while [ ! -e "$home/ownership-held" ] && [ "$i" -lt 200 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$home/ownership-held" ] || fail "the fixture never excluded the monitor's first ownership observation"
+  SESSION_OWNER_PID=$owner
+  start_session_watcher "$home"
+  arm=$SESSION_ARM_PID
+  watcher=$SESSION_WATCH_PID
+  kill -TERM "$owner"
+  wait "$owner" || true
+  kill -KILL "$arm"
+  wait "$arm" 2>/dev/null || true
+  : > "$home/ownership-release"
+  wait "$holder" || fail "the fixture could not publish replacement ownership"
+  sleep 2
+  session_process_alive "$replacement" || fail "the replacement owner exited before the assertion"
+  session_process_alive "$watcher" || fail "a replacement published before monitor startup lost its watcher"
+  [ "$(cat "$home/state/.watch.lock/pid")" = "$watcher" ] || fail "replacement changed the watcher singleton"
+  kill -TERM "$replacement"
+  wait "$replacement" || true
+  SESSION_WATCH_PID=$watcher
+  wait_session_watcher "$home" gone
+  pass "replacement before the monitor's first observation survives the old launcher and stops at its own exit"
 }
 
 test_owner_exit_stops_a_blocked_check() {
@@ -533,6 +670,9 @@ test_queue_append_during_checkpoint_still_resurfaces
 test_session_exit_stops_only_its_watcher
 test_replacement_owner_preserves_supervision_until_it_exits
 test_launcher_exit_stops_watcher_with_a_live_shared_owner
+test_live_owner_with_unreadable_identity_retains_supervision
+test_launcher_exit_before_identity_capture_stops_watcher
+test_replacement_before_first_owner_observation_preserves_supervision
 test_owner_exit_stops_a_blocked_check
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
