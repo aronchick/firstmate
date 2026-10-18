@@ -1,0 +1,9 @@
+Pending-reply persisted sender: alive after Honolulu -> New York
+Pending-reply mismatched identity: rejected
+Remote-job persisted owner: alive after Honolulu -> New York
+Remote-job mismatched start: rejected
+Before fix identity differs:
+Sun Oct 18 06:50:44 2026     bash /Users/daaronch/.no-mistakes/evidence/01M57YG5Y9JK5SPWNYV77H83MZ/identity-focused.sh
+Sun Oct 18 12:50:44 2026     bash /Users/daaronch/.no-mistakes/evidence/01M57YG5Y9JK5SPWNYV77H83MZ/identity-focused.sh
+After fix identity matches for the same real process
+Teardown identity helper: timezone match and wrong-identity rejection (lstart=Sun Oct 18 16:50:44 2026)
