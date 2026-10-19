@@ -408,6 +408,7 @@ An arm whose own script path sits under a disposable no-mistakes validation chec
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
 `watch_session_owner` in `bin/fm-watch.sh` owns the session-exit backstop, including process identity, replacement adoption, launcher lifetime, and signal-target verification.
 It runs independently of the poll loop for a cycle started with a session lock, so owner exit stops even a blocked poll without signalling another home's watcher.
+For daemon-managed cycles, `bin/fm-supervise-daemon.sh` checks session ownership before restarting a stopped watcher, preserving a live replacement owner and shutting down after confirmed owner exit.
 Pi and omp's native shutdown handlers remain responsible for conversation changes inside a live process.
 Codex Desktop can share an app-server across chats.
 Closing a chat while both the server and its background arm remain alive has no verified session-exit signal in this integration and is unsupported by the auto-stop backstop.
@@ -420,7 +421,8 @@ A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lo
 
 ## Regression coverage
 
-`tests/fm-watch-checkpoint.test.sh` runs real arms and watchers in isolated homes to exercise owner exit, live replacement ownership after the old arm dies, cross-home isolation, launcher exit with a live shared owner, and owner exit during a blocked registered check.
+`tests/fm-watch-checkpoint.test.sh` runs real arms and watchers in isolated homes to exercise owner exit, live replacement ownership before the monitor's first observation and after the old arm dies, cross-home isolation, unreadable owner identity, launcher exit before identity capture and with a live shared owner, and owner exit during a blocked registered check.
+`tests/fm-wake-daemon-lifecycle-e2e.test.sh` covers the daemon's restart boundary with a live owner, a live replacement, and session exit.
 
 ### Pi and OpenCode watch extension
 
