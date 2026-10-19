@@ -1,0 +1,11 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.km9EFA
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.zZfpbJ
+/Users/daaronch/.no-mistakes/evidence/01M58NXG5W13QAX1MXT6X6M3BY/live-replacement.sh: line 41: 17753 Killed: 9                  FM_HOME="$LAB" FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 bin/fm-watch-arm.sh > "$E/replacement-arm.log" 2>&1
+Replacement=20036 preserves watcher=17948 after original owner=17744 and launcher=17753 exit
+Replacement exit stops watcher=17948; other watcher remains live
+/Users/daaronch/.no-mistakes/evidence/01M58NXG5W13QAX1MXT6X6M3BY/live-replacement.sh: line 18: 17755 Killed: 9                  FM_HOME="$other" FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 bin/fm-watch-arm.sh > "$E/launcher-arm.log" 2>&1
+Launcher=17755 exit stops watcher=17957 while shared owner=17748 remains live
+watcher: started pid=17948 (beacon fresh)
+watcher: exiting - session owner exited: pid=20036
+watcher: started pid=17957 (beacon fresh)
+watcher: exiting - session launcher exited: pid=17755

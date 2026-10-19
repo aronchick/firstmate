@@ -1,0 +1,16 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.dgzhFW
+watcher=25986 previous=
+watcher=47350 previous=25986
+PASS daemon restarts watcher while owner lives
+watcher=57007 previous=
+watcher=78253 previous=57007
+PASS daemon restarts watcher for live replacement after old owner exits
+[2026-10-18T20:19:46-0400] daemon starting (pid 25119); target=%0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-10-18T20:19:47-0400] watcher exited rc=143 reason=''; restarting after 5s
+[2026-10-18T20:19:54-0400] wake: check: rearm-resurface
+[2026-10-18T20:19:55-0400] escalate: check: rearm-resurface -> check: rearm-resurface
+[2026-10-18T20:19:57-0400] watcher exited rc=143 reason=''; restarting after 5s
+[2026-10-18T20:20:05-0400] session owner exited; stopping instead of restarting watcher
+[2026-10-18T20:20:05-0400] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-18T20:20:05-0400] daemon shutting down
+PASS replacement exit stops daemon and watcher, releases both ownership records

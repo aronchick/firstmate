@@ -1,0 +1,5 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.wRNaqO/race
+started home=race owner=91731 arm=92562 watcher=92709
+PASS replacement=91732 published before first observation; watcher=92709 survives old owner=91731 and launcher=92562 exit
+watcher: exiting - session owner exited: pid=91732
+PASS replacement exit stops preserved watcher

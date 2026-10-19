@@ -1,0 +1,17 @@
+live-watch.log: pid=49375 live=false
+live-watch.log: pid=49378 live=false
+live-watch.log: pid=49491 live=false
+live-watch.log: pid=49492 live=false
+live-replacement.log: pid=17744 live=false
+live-replacement.log: pid=17748 live=false
+live-replacement.log: pid=17753 live=false
+live-replacement.log: pid=17755 live=false
+live-replacement.log: pid=17948 live=false
+live-replacement.log: pid=17957 live=false
+live-replacement.log: pid=20036 live=false
+live-blocked.log: pid=93359 live=false
+live-blocked.log: pid=93363 live=false
+live-blocked.log: pid=93792 live=false
+live-blocked.log: pid=93793 live=false
+live-blocked.log: pid=96525 live=false
+All recorded manual lab homes removed; private primary tmux server previously confirmed stopped.

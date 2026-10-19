@@ -1,0 +1,20 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.ovnQle/a
+started home=a owner=67230 arm=67541 watcher=67854
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.ovnQle/b
+started home=b owner=69986 arm=70106 watcher=70391
+watcher: exiting - session owner exited: pid=67230
+PASS owner exit stops watcher; second home owner and watcher survive
+watcher: exiting - session launcher exited: pid=70106
+PASS launcher exit stops watcher while shared owner survives
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.ovnQle/replacement
+started home=replacement owner=86786 arm=86927 watcher=87249
+replacement watcher=87249 survives posture=away
+replacement watcher=87249 survives posture=quiet
+watcher: exiting - session owner exited: pid=90660
+PASS replacement survives original owner and launcher exit; stops at replacement exit
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.ovnQle/blocked
+registered: state/blocked.check.sh
+started home=blocked owner=18632 arm=19460 watcher=19678
+watcher: exiting - session owner exited: pid=18632
+PASS owner exit stops watcher=19678 and blocked check=23763
+All direct process scenarios passed; cleanup follows via EXIT trap.

@@ -1,0 +1,9 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.0j9qRX
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.bdJyej
+registered: state/blocked.check.sh
+Registered check=96525 is blocked while owner and watcher are live
+Before exit: owner=93359 watcher=93792 other-owner=93363 other-watcher=93793 all alive
+After owner exit: watcher=93792 stopped; other-owner=93363 and other-watcher=93793 remain alive
+watcher: started pid=93792 (beacon fresh)
+watcher: exiting - session owner exited: pid=93359
+Blocked check=96525 reaped after owner exit

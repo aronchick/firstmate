@@ -1,0 +1,7 @@
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.m7pgmN
+/private/var/folders/22/0hyg7lbs2fb34hr0ryq3sl1m0000gn/T/fm-lab.ynhduu
+Before exit: owner=49375 watcher=49491 other-owner=49378 other-watcher=49492 all alive
+After owner exit: watcher=49491 stopped; other-owner=49378 and other-watcher=49492 remain alive
+watcher: started pid=49491 (beacon fresh)
+watcher: exiting - session owner exited: pid=49375
+watcher: FAILED - watcher cycle exited 143 without an actionable reason
