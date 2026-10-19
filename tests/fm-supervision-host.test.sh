@@ -2367,15 +2367,18 @@ test_engine_turn_is_bounded_and_its_descendants_reaped() {
 }
 
 test_restarted_host_stops_what_a_killed_predecessor_left() {
-  local home first_host arm watcher
+  local home first_host arm watcher owner
   home=$(make_home away-crash away)
-  start_host "$home"
+  # Crash only the host: session exit would correctly reap its watcher first.
+  FM_TEST_KEEP_SESSION_ALIVE=1 start_host "$home"
   wait_until 150 watcher_live "$home" || fail "crash: the host never started a watcher cycle"
   first_host=$(awk -F '\t' '$1 == "host" { print $2 }' "$home/state/.supervision-host")
   arm=$(awk -F '\t' '$1 == "arm" { print $2 }' "$home/state/.supervision-host")
   watcher=$(cat "$home/state/.watch.lock/pid")
+  owner=$(cat "$home/state/.lock")
   kill -KILL "$first_host"
-  sleep 1
+  sleep 3
+  kill -0 "$owner" 2>/dev/null || fail "crash: fixture session exited before host recovery"
   kill -0 "$arm" 2>/dev/null || fail "crash: fixture error: the arm died with its host, so this case proves nothing"
   start_host "$home"
   wait_until 200 sh -c '! kill -0 "$1" 2>/dev/null && ! kill -0 "$2" 2>/dev/null' _ "$arm" "$watcher" \
@@ -2610,7 +2613,7 @@ test_park_limit_lets_a_turn_outlive_the_boundary() {
 test_first_cycle_status_streams_and_owner_options_reach_it() {
   local home stale fresh generation predecessor
   home=$(make_home stream attended pi)
-  start_host "$home"
+  FM_TEST_KEEP_SESSION_ALIVE=1 start_host "$home"
   wait_until 150 grep -qs '^watcher: started pid=' "$home/host.out" \
     || fail "stream: the first cycle's status did not reach the owner before a close: $(cat "$home/host.out")"
   host_exited "$home" && fail "stream: the host exited before any close: $(cat "$home/host.out")"
@@ -2623,17 +2626,16 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" >/dev/null 2> "$home/drain.err" || fail "stream: main's drain failed"
   ack_drain_err "$home/state" "$home/drain.err" >/dev/null 2>&1 || fail "stream: main's acknowledgement failed: $(cat "$home/drain.err")"
   # Pass-through can leave a successor watcher running. Retire that cycle so
-  # the orphan-arm fixture below owns the watcher we later ask --restart to replace.
+  # the standalone arm below owns the watcher we later ask --restart to replace.
   FM_HOME="$home" "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null || fail "stream: could not stop the prior cycle"
 
-  # A watcher a dead arm left behind, holding this home's watcher lock.
+  # A live cycle holding this home's watcher lock. Killing its arm here would
+  # let session-exit cleanup win before --restart can exercise replacement.
   FM_HOME="$home" PATH="$home/fakebin:$PATH" perl -e 'setpgrp(0, 0); exec @ARGV' "$ROOT/bin/fm-watch-arm.sh" \
     > "$home/stale-arm.out" 2>&1 &
   wait_until 150 grep -qs '^watcher: started pid=' "$home/stale-arm.out" \
     || fail "stream: the fixture arm never started its watcher: $(cat "$home/stale-arm.out")"
   wait_until 150 watcher_live "$home" || fail "stream: the fixture watcher never started"
-  kill -KILL "$!" 2>/dev/null || true
-  wait "$!" 2>/dev/null || true
   stale=$(cat "$home/state/.watch.lock/pid")
   rm -f "$home/host.out" "$home/host.rc"
   start_host "$home" --restart
